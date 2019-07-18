@@ -4,7 +4,7 @@ LIB_OUTPUT         = libpil.a
 LIB_HEADERS        = $(wildcard include/*.h)
 LIB_SOURCES        = $(wildcard src/*.cc) $(wildcard src/linux/*.cc)
 LIB_OBJECTS        = ${LIB_SOURCES:.cc=.o}
-LIB_DEPENDENCIES   = ${LIB_OBJECTS:.cc=.dep}
+LIB_DEPENDENCIES   = ${LIB_SOURCES:.cc=.dep}
 LIB_INCLUDE_DIRS   = -I. -Iinclude
 LIB_WARNINGS       = -Wall -Wextra
 LIB_CCFLAGS        = -std=c++11 -fstrict-aliasing -D__STDC_FORMAT_MACROS ${LIB_INCLUDE_DIRS} ${LIB_WARNINGS}
@@ -28,4 +28,7 @@ ${LIB_OUTPUT}: ${LIB_OBJECTS}
 
 ${LIB_OBJECTS}: %.o: %.cc
 	${CC} ${CCFLAGS} ${LIB_CCFLAGS} -o $@ -c $<
+
+${LIB_DEPENDENCIES}: %.dep: %.cc Makefile
+	${CC} ${CCFLAGS} ${LIB_CCFLAGS} -MM $< > $@
 
