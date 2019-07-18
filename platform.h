@@ -316,6 +316,94 @@
     (((_objsize) * (_count)) + ((_objalign)-1))
 #endif
 
+// Swap the bytes in a two-byte value.
+// _v: The value to byte swap.
+// Returns the byte swapped value.
+#ifndef PIL_ByteSwap2
+#define PIL_ByteSwap2(_v)                                                      \
+    ( (((_v) >> 8) & 0x00FF) |                                                 \
+      (((_v) << 8) & 0xFF00) )
+#endif
+
+// Swap the bytes in a four-byte value.
+// _v: The value to byte swap.
+// Returns the byte swapped value.
+#ifndef PIL_ByteSwap4
+#define PIL_ByteSwap4(_v)                                                      \
+    ( (((_v) >> 24) & 0x000000FF) |                                            \
+      (((_v) >>  8) & 0x0000FF00) |                                            \
+      (((_v) <<  8) & 0x00FF0000) |                                            \
+      (((_v) << 24) & 0xFF000000) )
+#endif
+
+// Swap the bytes in an eight-byte value.
+// _v: The value to byte swap.
+// Returns the byte swapped value.
+#ifndef PIL_ByteSwap8
+#define PIL_ByteSwap8(_v)                                                      \
+    ( (((_v) >> 56) & 0x00000000000000FFULL) |                                 \
+      (((_v) >> 40) & 0x000000000000FF00ULL) |                                 \
+      (((_v) >> 24) & 0x0000000000FF0000ULL) |                                 \
+      (((_v) >>  8) & 0x00000000FF000000ULL) |                                 \
+      (((_v) <<  8) & 0x000000FF00000000ULL) |                                 \
+      (((_v) << 24) & 0x0000FF0000000000ULL) |                                 \
+      (((_v) << 40) & 0x00FF000000000000ULL) |                                 \
+      (((_v) << 56) & 0xFF00000000000000ULL) )
+#endif
+
+// Make an packed 32-bit value from four ASCII characters.
+// _a: An ASCII character.
+// _b: An ASCII character. 
+// _c: An ASCII character.
+// _d: An ASCII character.
+// Returns a 32-bit unsigned integer value comprised of the given characters.
+#ifndef PIL_MakeTag
+#define PIL_MakeTag(_a, _b, _c, _d)                                            \
+    (((uint32_t)(uint8_t)(_a)      ) |                                         \
+     ((uint32_t)(uint8_t)(_b) <<  8) |                                         \
+     ((uint32_t)(uint8_t)(_c) << 16) |                                         \
+     ((uint32_t)(uint8_t)(_d) << 24))
+#endif
+
+// Allocate host memory with the correct size and alignment for an instance of a given type from a memory arena.
+// _arena: The PIL_MEMORY_ARENA from which the allocation is being made.
+// _type : A typename, such as int, specifying the type being allocated.
+// Returns a pointer to the start of the allocated memory block, or NULL.
+#ifndef PIL_MemoryArenaAllocateHostType
+#define PIL_MemoryArenaAllocateHostType(_arena, _type)                             \
+    ((_type*) PIL_MemoryArenaAllocateHost(NULL, (_arena), sizeof(_type), PIL_ALIGN_OF(_type)))
+#endif
+
+// Allocate memory with the correct size and alignment for an array of instance of a given type from a memory arena.
+// _arena: The PIL_MEMORY_ARENA from which the allocation is being made.
+// _type : A typename, such as int, specifying the type being allocated.
+// _count: The number of elements in the array.
+// Returns a pointer to the start of the allocated memory block, or NULL.
+#ifndef PIL_MemoryArenaAllocateHostArray
+#define PIL_MemoryArenaAllocateHostArray(_arena, _type, _count)                    \
+    ((_type*) PIL_MemoryArenaAllocateHost(NULL, (_arena), sizeof(_type) * (_count), PIL_ALIGN_OF(_type)))
+#endif
+
+// Allocate memory with the given object size and alignment for an array of object data from a memory arena.
+// _arena: The PIL_MEMORY_ARENA from which the allocation is being made.
+// _objsize: The object size, in bytes.
+// _count: The number of elements in the array.
+// _align: The object alignment, in bytes.
+// Returns a pointer to the start of the allocated memory block, or NULL.
+#ifndef PIL_MemoryArenaAllocateHostArrayRaw
+#define PIL_MemoryArenaAllocateHostArrayRaw(_arena, _objsize, _align, _count)      \
+    ((uint8_t*) PIL_MemoryArenaAllocateHost(NULL, (_arena), (_objsize) * (_count), (_align)))
+#endif
+
+// Allocate a fixed-size array on the system heap.
+// _type : A typename, such as int, specifying the type being allocated.
+// _count: The number of elements in the array.
+// Returns a pointer to the start of the allocated array, or NULL.
+#ifndef PIL_HostMemoryAllocateHeapArray
+#define PIL_HostMemoryAllocateHeapArray(_type, _count)                             \
+    ((_type*) PIL_HostMemoryAllocateHeap(NULL, sizeof(_type) * (_count), PIL_ALIGN_OF(_type)))
+#endif
+
 // Helper macro for populating a dispatch table with functions loaded at runtime.
 // If the function is not found, the entry point is updated to point to a stub implementation provided by the caller.
 // This macro relies on specific naming conventions:
@@ -352,19 +440,98 @@
     (_disp)->_func == _func##_Stub
 #endif
 
-// Forward-declare the types exported from libpil.
+// Forward-declare the types exported from the platform interface layer.
 struct  PIL_CONTEXT;
-struct  PIL_CONTEXT_INIT;                                   // Defined in platform.h.
-struct  PIL_RUNTIME_MODULE;                                 // Defined in platform/dylib.h.
+struct  PIL_CONTEXT_INIT;                                                      // Defined in platform.h.
+struct  PIL_RUNTIME_MODULE;                                                    // Defined in platform/dylib.h.
+struct  PIL_MEMORY_BLOCK;                                                      // Defined in platform.h.
+struct  PIL_MEMORY_ARENA;                                                      // Defined in platform.h.
+struct  PIL_MEMORY_ARENA_INIT;                                                 // Defined in platform.h.
+struct  PIL_MEMORY_ARENA_MARKER;                                               // Defined in platform.h.
 
-typedef int  (*PIL_PFN_Unknown)(void);                      // Signature for a dynamically-resolved function. The calling code will have to cast the function pointer to its specific type.
+typedef int  (*PIL_PFN_Unknown)(void);                                         // Signature for a dynamically-resolved function. The calling code will have to cast the function pointer to its specific type.
 
-typedef struct PIL_CONTEXT_INIT {
-    char const *ApplicationName;                            // A nul-terminate string specifying a name for the application creating the context.
-    int32_t     AppVersionMajor;                            // The major version component of the application.
-    int32_t     AppVersionMinor;                            // The minor version component of the application.
-    int32_t     AppVersionPatch;                            // The patch version component of the application.
+typedef enum   PIL_MEMORY_ALLOCATOR_TYPE {                                     // Define the allowed values for memory allocator types. An allocator can manage either host or device memory. Device memory may or may not be visible to the host CPU.
+    PIL_MEMORY_ALLOCATOR_TYPE_INVALID                 =  0UL,                  // This value is invalid and should not be used.
+    PIL_MEMORY_ALLOCATOR_TYPE_HOST_VMM                =  1UL,                  // The allocator is a host memory allocator, returning address space from the system virtual memory manager.
+    PIL_MEMORY_ALLOCATOR_TYPE_HOST_HEAP               =  2UL,                  // The allocator is a host memory allocator, returning address space from the system heap.
+    PIL_MEMORY_ALLOCATOR_TYPE_DEVICE                  =  3UL,                  // The allocator is a device memory allocator.
+} PIL_MEMORY_ALLOCATOR_TYPE;
+
+typedef enum   PIL_MEMORY_ARENA_FLAGS {                                        // Flags that can be bitwise OR'd to control the behavior of an arena memory allocator.
+    PIL_MEMORY_ARENA_FLAGS_NONE                       = (0UL <<  0),           // No flags are specified. Specifying no flags will cause arena creation to fail.
+    PIL_MEMORY_ARENA_FLAG_INTERNAL                    = (1UL <<  0),           // The memory arena should allocate memory internally, and free the memory when the arena is destroyed.
+    PIL_MEMORY_ARENA_FLAG_EXTERNAL                    = (1UL <<  1),           // The memory arena uses memory supplied and managed by the application.
+} PIL_MEMORY_ARENA_FLAGS;
+
+typedef enum   PIL_HOST_MEMORY_ALLOCATION_FLAGS {                              // Flags that can be bitwise OR'd to control the allocation attributes for a single host memory allocation.
+    PIL_HOST_MEMORY_ALLOCATION_FLAGS_DEFAULT         = (0UL <<  0),            // The memory can be read and written by the host, and ends with a guard page.
+    PIL_HOST_MEMORY_ALLOCATION_FLAG_READ             = (1UL <<  0),            // The memory can be read by the host.
+    PIL_HOST_MEMORY_ALLOCATION_FLAG_WRITE            = (1UL <<  1),            // The memory can be written by the host.
+    PIL_HOST_MEMORY_ALLOCATION_FLAG_EXECUTE          = (1UL <<  2),            // The allocation can contain code that can be executed by the host.
+    PIL_HOST_MEMORY_ALLOCATION_FLAG_NOGUARD          = (1UL <<  3),            // The allocation will not end with a guard page.
+    PIL_HOST_MEMORY_ALLOCATION_FLAGS_READWRITE       =                         // The committed memory can be read and written by the host.
+        PIL_HOST_MEMORY_ALLOCATION_FLAG_READ         | 
+        PIL_HOST_MEMORY_ALLOCATION_FLAG_WRITE
+} PIL_HOST_MEMORY_ALLOCATION_FLAGS;
+
+typedef enum   PIL_DEVICE_MEMORY_ALLOCATION_FLAGS {                            // Flags that can be bitwise OR'd to control the allocation attributes for a single device memory allocation.
+    PIL_DEVICE_MEMORY_ALLOCATION_FLAGS_DEFAULT       = (0UL <<  0),            // Equivalent to PIL_HOST_MEMORY_ALLOCATION_FLAG_DEVICE_LOCAL.
+    PIL_DEVICE_MEMORY_ALLOCATION_FLAG_DEVICE_LOCAL   = (1UL <<  0),            // Allocate in device-local memory, which may not be directly visible to the host CPU.
+    PIL_DEVICE_MEMORY_ALLOCATION_FLAG_HOST_VISIBLE   = (1UL <<  1),            // The returned address should be visible to the host CPU.
+    PIL_DEVICE_MEMORY_ALLOCATION_FLAG_COHERENT       = (1UL <<  2),            // The memory should be host CPU cache coherent.
+    PIL_DEVICE_MEMORY_ALLOCATION_FLAG_WRITE_COMBINED = (1UL <<  3),            // The memory should be write-combined.
+} PIL_DEVICE_MEMORY_ALLOCATION_FLAGS;
+
+typedef union  PIL_ADDRESS_OR_OFFSET {                                         // A union representing either an offset from some base location, or a valid address in the host process address space.
+    uint64_t                 BaseOffset;                                       // The offset value, specified relative to some base location.
+    void                   *HostAddress;                                       // The address in the host process address space.
+} PIL_ADDRESS_OR_OFFSET;
+
+typedef struct PIL_CONTEXT_INIT {                                              // 
+    char const         *ApplicationName;                                       // A nul-terminated string specifying a name for the application creating the context.
+    int32_t             AppVersionMajor;                                       // The major version component of the application.
+    int32_t             AppVersionMinor;                                       // The minor version component of the application.
+    int32_t             AppVersionPatch;                                       // The patch version component of the application.
 } PIL_CONTEXT_INIT;
+
+typedef struct PIL_MEMORY_BLOCK {                                              // Data associated with a host or device memory allocation.
+    uint64_t             BytesCommitted;                                       // The number of bytes that can be accessed by the application.
+    uint64_t              BytesReserved;                                       // The number of bytes of address space reserved by the allocation.
+    uint64_t                BlockOffset;                                       // The byte offset of the start of the allocated region. This value is set for both host and device allocations.
+    uint8_t                *HostAddress;                                       // The address of the allocated region in the host process address space. This value is NULL for device allocations.
+    uint32_t            AllocationFlags;                                       // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS enumeration.
+    uint32_t               AllocatorTag;                                       // The tag of the memory allocator that created the block (produced with PIL_MakeTag).
+} PIL_MEMORY_BLOCK;
+
+typedef struct PIL_MEMORY_ARENA {                                              // An arena-style memory allocator.
+    char const          *AllocatorName;                                        // A nul-terminated string specifying the name of the allocator. Used for debugging.
+    uint64_t               MemoryStart;                                        // The address or offset of the start of the memory block from which sub-allocations are returned.
+    uint64_t                NextOffset;                                        // The byte offset of the next permanent allocation to return.
+    uint64_t             MaximumOffset;                                        // The maximum value of NextOffset.
+    uint64_t                NbReserved;                                        // The number of bytes of reserved address space.
+    uint64_t               NbCommitted;                                        // The number of bytes of committed address space.
+    uint32_t             AllocatorType;                                        // One of the values of the PIL_MEMORY_ALLOCATOR_TYPE enumeration specifying whether the memory allocator allocates host or device memory.
+    uint32_t              AllocatorTag;                                        // An opaque 32-bit value used to tag allocations from the arena.
+    uint32_t           AllocationFlags;                                        // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS or PIL_DEVICE_MEMORY_ALLOCATION_FLAGS enumeration.
+    uint32_t                ArenaFlags;                                        // One or more bitwise-OR'd values of the PIL_MEMORY_ARENA_FLAGS enumeration.
+} PIL_MEMORY_ARENA;
+
+typedef struct PIL_MEMORY_ARENA_INIT {                                         // Data used to configure an arena-style memory allocator.
+    char const          *AllocatorName;                                        // A nul-terminated string specifying the name of the allocator. Used for debugging.
+    uint64_t               ReserveSize;                                        // The number of bytes of address space reserved for the memory block.
+    uint64_t             CommittedSize;                                        // The number of bytes of address space committed in the memory block.
+    PIL_ADDRESS_OR_OFFSET  MemoryStart;                                        // The offset or host address of the start of the allocated memory block.
+    uint32_t             AllocatorType;                                        // One of the values of the PIL_MEMORY_ALLOCATOR_TYPE enumeration specifying whether the memory allocator allocates host or device memory.
+    uint32_t              AllocatorTag;                                        // An opaque 32-bit value used to tag allocations from the arena.
+    uint32_t           AllocationFlags;                                        // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS or PIL_DEVICE_MEMORY_ALLOCATION_FLAGS enumeration.
+    uint32_t                ArenaFlags;                                        // One or more bitwise-OR'd values of the PIL_MEMORY_ARENA_FLAGS enumeration.
+} PIL_MEMORY_ARENA_INIT;
+
+typedef struct PIL_MEMORY_ARENA_MARKER {                                       // Stores the state of an arena allocator at a specific point in time. A marker can be used to roll-back the allocator state to the marked point in time, invalidating all allocations made since that point.
+    struct PIL_MEMORY_ARENA     *Arena;                                        // The PIL_MEMORY_ARENA from which the marker was obtained.
+    uint64_t                     State;                                        // A value encoding the state of the memory arena when the marker was obtained.
+} PIL_MEMORY_ARENA_MARKER;
 
 #ifdef __cplusplus
 extern "C" {
@@ -437,6 +604,239 @@ PIL_RuntimeModuleResolve
 (
     struct PIL_RUNTIME_MODULE *module, 
     char const                *symbol
+);
+
+// Mix the bits in a 32-bit value.
+// input: The input value.
+// Returns the input value with its bits mixed.
+PIL_API(uint32_t)
+PIL_BitsMix32
+(
+    uint32_t input
+);
+
+// Mix the bits in a 64-bit value.
+// input: The input value.
+// Returns the input value with its bits mixed.
+PIL_API(uint64_t)
+PIL_BitsMix64
+(
+    uint64_t input
+);
+
+// Compute a 32-bit non-cryptographic hash of some data.
+// data: The data to hash.
+// length: The number of bytes of data to hash.
+// seed: An initial value used to seed the hash.
+// Returns a 32-bit unsigned integer computed from the data.
+PIL_API(uint32_t)
+PIL_HashData32
+(
+    void const *data, 
+    size_t    length, 
+    uint32_t    seed
+);
+
+// Compute a 64-bit non-cryptographic hash of some data.
+// data: The data to hash.
+// length: The number of bytes of data to hash.
+// seed: An initial value used to seed the hash.
+// Returns a 64-bit unsigned integer computed from the data.
+PIL_API(uint64_t)
+PIL_HashData64
+(
+    void const *data, 
+    size_t    length, 
+    uint64_t    seed 
+);
+
+// Allocate memory from the system heap.
+// o_block: Pointer to a MEMORY_BLOCK to populate with information about the allocation.
+// n_bytes: The minimum number of bytes to allocate.
+// alignment: The required alignment, in bytes. The PIL_AlignOf(T) macro can be used to obtain the necessary alignment for a given type. 
+// Returns a pointer to the start of the aligned memory block, or NULL if the allocation request could not be satisfied.
+PIL_API(void*)
+PIL_HostMemoryAllocateHeap
+(
+    struct PIL_MEMORY_BLOCK *o_block, 
+    size_t                   n_bytes, 
+    size_t                 alignment
+);
+
+// Free a memory block returned from the system heap.
+// host_addr: An address returned by PIL_HostMemoryAllocateHeap.
+PIL_API(void)
+PIL_HostMemoryFreeHeap
+(
+    void *host_addr
+);
+
+// Allocate address space from the host virtual memory manager.
+// The memory block is aligned to at least the operating system page size.
+// o_block: Pointer to a PIL_MEMORY_BLOCK to populate with information about the allocation.
+// reserve_bytes: The number of bytes of process address space to reserve.
+// commit_bytes: The number of bytes of process address space to commit. This value can be zero.
+// alloc_flags: One or more bitwise OR'd values from the PIL_HOST_MEMORY_ALLOCATION_FLAGS enumeration.
+// Returns a pointer to the start of the reserved address space, or NULL if the allocation could not be satisfied.
+PIL_API(void*)
+PIL_HostMemoryReserveAndCommit
+(
+    struct PIL_MEMORY_BLOCK *o_block, 
+    size_t             reserve_bytes, 
+    size_t              commit_bytes, 
+    uint32_t             alloc_flags
+);
+
+// Increase the number of bytes committed in a memory block allocated from the host virtual memory manager.
+// The commitment is rounded up to the next even multiple of the operating system page size.
+// o_block: Pointer to a PIL_MEMORY_BLOCK describing the memory block attributes after the commitment increase.
+// block: Pointer to a PIL_MEMORY_BLOCK describing the memory block attributes prior to the commitment increase.
+// commit_bytes: The total amount of address space within the memory block that should be committed, in bytes.
+// Returns non-zero if at least commit_bytes are committed within the memory block, or zero if the commitment could not be met.
+PIL_API(int32_t)
+PIL_HostMemoryIncreaseCommitment
+(
+    struct PIL_MEMORY_BLOCK *o_block, 
+    struct PIL_MEMORY_BLOCK   *block, 
+    size_t              commit_bytes
+);
+
+// Flush the host CPU instruction cache after writing dynamically-generated code to a memory block.
+// block: Pointer to a PIL_MEMORY_BLOCK describing the memory block containing the dynamically-generated code.
+PIL_API(void)
+PIL_HostMemoryFlush
+(
+    struct PIL_MEMORY_BLOCK const *block
+);
+
+// Decommit and release a block of memory returned by the system virtual memory manager.
+// host_addr: An address returned by PIL_HostMemoryReserveAndCommit.
+PIL_API(void)
+PIL_HostMemoryRelease
+(
+    void *host_addr
+);
+
+// Check a PIL_MEMORY_BLOCK to determine whether it represents a valid allocation (as opposed to a failed allocation).
+// block: The PIL_MEMORY_BLOCK to inspect.
+// Returns non-zero if the block describes a valid allocation, or zero if block describes a failed allocation.
+PIL_API(int32_t)
+PIL_MemoryBlockIsValid
+(
+    struct PIL_MEMORY_BLOCK const *block
+);
+
+// Compare two PIL_MEMORY_BLOCK instances to determine if a reallocation moved the memory block.
+// old_block: A description of the memory block prior to the reallocation.
+// new_block: A description of the memory block after the reallocation.
+// Returns non-zero if the memory block moved, or zero if the memory block did not move.
+PIL_API(int32_t)
+PIL_MemoryBlockDidMove
+(
+    struct PIL_MEMORY_BLOCK const *old_block, 
+    struct PIL_MEMORY_BLOCK const *new_block
+);
+
+// Create a memory arena using the specified configuration.
+// The memory arena can sub-allocate from either an internal or an external block of memory.
+// o_arena: The PIL_MEMORY_ARENA to initialize.
+// init: Data used to configure the behavior of the memory arena.
+// Returns zero if the memory arena is successfully created, or -1 if an error occurred.
+PIL_API(int)
+PIL_MemoryArenaCreate
+(
+    struct PIL_MEMORY_ARENA         *o_arena, 
+    struct PIL_MEMORY_ARENA_INIT const *init
+);
+
+// Free resources associated with a memory arena.
+// For a memory arena managing an internal memory block, this frees the memory block.
+// arena: The memory arena to delete.
+PIL_API(void)
+PIL_MemoryArenaDelete
+(
+    struct PIL_MEMORY_ARENA *arena
+);
+
+// Allocate memory from an arena.
+// o_block: Pointer to a PIL_MEMORY_BLOCK to populate with information about the allocation.
+// arena: The memory arena from which the memory will be allocated.
+// size: The minimum number of bytes to allocate.
+// alignment: The required alignment of the returned address, in bytes.
+// Returns zero if the allocation is successful and o_block is populated with information about the allocation, or -1 if the allocation request could not be satisfied.
+PIL_API(int)
+PIL_MemoryArenaAllocate
+(
+    struct PIL_MEMORY_BLOCK *o_block, 
+    struct PIL_MEMORY_ARENA   *arena, 
+    size_t                      size, 
+    size_t                 alignment
+);
+
+// Allocate host memory from an arena.
+// The arena must have type PIL_MEMORY_ALLOCATOR_TYPE_HOST_HEAP or PIL_MEMORY_ALLOCATOR_TYPE_HOST_VMM.
+// o_block: Pointer to an optional PIL_MEMORY_BLOCK to populate with information about the allocation.
+// arena: The memory arena from which the memory will be allocated.
+// size: The minimum number of bytes to allocate.
+// alignment: The required alignment of the returned address, in bytes.
+// Returns a pointer to the start of the memory block, or NULL if the allocation request could not be satisfied.
+PIL_API(void*)
+PIL_MemoryArenaAllocateHost
+(
+    struct PIL_MEMORY_BLOCK *o_block, 
+    struct PIL_MEMORY_ARENA   *arena, 
+    size_t                      size, 
+    size_t                 alignment
+);
+
+// Retrieve a marker representing the state of the memory arena at the time of the call.
+// arena: The PIL_MEMORY_ARENA whose state will be returned.
+// Returns an object representing the state of the arena at the time of the call, which can be used to invalidate all allocations made after the call.
+PIL_API(struct PIL_MEMORY_ARENA_MARKER)
+PIL_MemoryArenaMark
+(
+    struct PIL_MEMORY_ARENA *arena
+);
+
+// Convert a memory arena marker into a valid address within the memory block managed by the arena.
+// The arena must have type PIL_MEMORY_ALLOCATOR_TYPE_HOST_HEAP or PIL_MEMORY_ALLOCATOR_TYPE_HOST_VMM.
+// marker: The PIL_MEMORY_ARENA_MARKER to query.
+// Returns the address in host memory corresponding to the address, or NULL if the marker or arena is invalid.
+PIL_API(uint8_t*)
+PIL_MemoryArenaMarkerToHostAddress
+(
+    struct PIL_MEMORY_ARENA_MARKER marker
+);
+
+// Calculate the difference, in bytes, between two memory arena markers.
+// The markers must have been obtained from the same arena and the arena must have type MEMORY_ALLOCATOR_TYPE_HOST_HEAP or MEMORY_ALLOCATOR_TYPE_HOST_VMM.
+// marker1: A memory arena marker.
+// marker2: A memory arena marker.
+// Returns the number of bytes between the two markers.
+PIL_API(ptrdiff_t)
+PIL_MemoryArenaMarkerDifference
+(
+    struct PIL_MEMORY_ARENA_MARKER marker1, 
+    struct PIL_MEMORY_ARENA_MARKER marker2
+);
+
+// Reset the state of the memory arena, invalidating all existing allocations.
+// arena: The PIL_MEMORY_ARENA to reset.
+PIL_API(void)
+PIL_MemoryArenaReset
+(
+    struct PIL_MEMORY_ARENA *arena
+);
+
+// Reset the state of the memory arena back to a previously obtained marker.
+// This invalidates all allocations from the arena made since the marker was obtained.
+// arena: The PIL_MEMORY_ARENA to reset.
+// marker: The marker representing the reset point.
+PIL_API(void)
+PIL_MemoryArenaResetToMarker
+(
+    struct PIL_MEMORY_ARENA        *arena, 
+    struct PIL_MEMORY_ARENA_MARKER marker 
 );
 
 #ifdef __cplusplus
