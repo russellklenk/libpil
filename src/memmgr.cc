@@ -365,18 +365,28 @@ PIL_MemoryArenaDelete
 )
 {
     if (arena) {
+        PIL_MEMORY_BLOCK block;
+
+        block.BytesCommitted  = arena->NbCommitted;
+        block.BytesReserved   = arena->NbReserved;
+        block.BlockOffset     = 0;
+        block.HostAddress     =(uint8_t*) arena->MemoryStart;
+        block.AllocationFlags = arena->AllocationFlags;
+        block.AllocatorTag    = arena->AllocatorTag;
+
         if (arena->ArenaFlags & PIL_MEMORY_ARENA_FLAG_INTERNAL) {
             if (arena->AllocatorType == PIL_MEMORY_ALLOCATOR_TYPE_HOST_HEAP) {
                 PIL_HostMemoryFreeHeap((void*) arena->MemoryStart);
                 arena->MemoryStart =(uint64_t) 0;
             } else if (arena->AllocatorType == PIL_MEMORY_ALLOCATOR_TYPE_HOST_VMM) {
-                PIL_HostMemoryRelease((void *) arena->MemoryStart);
+                PIL_HostMemoryRelease(&block);
                 arena->MemoryStart =(uint64_t) 0;
             } else {
                 assert(0 && "Unknown allocator type for INTERNAL arena (memory leak)");
                 return;
             }
         }
+
         arena->MaximumOffset = 0;
         arena->NbReserved    = 0;
         arena->NbCommitted   = 0;
