@@ -710,11 +710,11 @@ PIL_HostMemoryFlush
 );
 
 // Decommit and release a block of memory returned by the system virtual memory manager.
-// host_addr: An address returned by PIL_HostMemoryReserveAndCommit.
+// block: Pointer to a PIL_MEMORY_BLOCK describing the memory region to release.
 PIL_API(void)
 PIL_HostMemoryRelease
 (
-    void *host_addr
+    struct PIL_MEMORY_BLOCK *block
 );
 
 // Check a PIL_MEMORY_BLOCK to determine whether it represents a valid allocation (as opposed to a failed allocation).
