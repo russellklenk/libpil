@@ -238,6 +238,56 @@
 #   define PIL_API(_rt)                      extern _rt
 #endif
 
+// Define various shifts and masks used when working with item handles.
+// These values are used when constructing and breaking apart PIL_HANDLE_BITS values.
+// A PIL_HANDLE_BITS value consists of the following packed into a 32-bit unsigned integer:
+// 31.|....................|...........0
+//   F|IIIIIIIIIIIIIIIIIIII|GGGGGGGGGGG
+// Starting from the most signficant bit:
+// - F is set if the handle was valid at some point (used to distinguish valid and invalid handles).
+// - I is an index value specifying the SparseIndex array index, which is then used to look up the corresponding dense index.
+// - G is a generation counter used to differentiate handle slots that have been recycled.
+#ifndef PIL_HANDLE_CONSTANTS
+#   define PIL_HANDLE_CONSTANTS
+#   define PIL_HANDLE_BITS_INVALID           0UL
+#   define PIL_HANDLE_GENER_BITS             11
+#   define PIL_HANDLE_INDEX_BITS             20
+#   define PIL_HANDLE_FLAG_BITS              1
+
+#   define PIL_HANDLE_GENER_SHIFT            0
+#   define PIL_HANDLE_INDEX_SHIFT           (PIL_HANDLE_GENER_SHIFT + PIL_HANDLE_GENER_BITS)
+#   define PIL_HANDLE_FLAG_SHIFT            (PIL_HANDLE_INDEX_SHIFT + PIL_HANDLE_INDEX_BITS)
+
+#   define PIL_HANDLE_GENER_MASK           ((1UL << PIL_HANDLE_GENER_BITS) - 1)
+#   define PIL_HANDLE_INDEX_MASK           ((1UL << PIL_HANDLE_INDEX_BITS) - 1)
+#   define PIL_HANDLE_FLAG_MASK            ((1UL << PIL_HANDLE_FLAG_BITS ) - 1)
+
+#   define PIL_HANDLE_GENER_MASK_PACKED     (PIL_HANDLE_GENER_MASK << PIL_HANDLE_GENER_SHIFT)
+#   define PIL_HANDLE_INDEX_MASK_PACKED     (PIL_HANDLE_INDEX_MASK << PIL_HANDLE_INDEX_SHIFT)
+#   define PIL_HANDLE_FLAG_MASK_PACKED      (PIL_HANDLE_FLAG_MASK  << PIL_HANDLE_FLAG_SHIFT )
+#   define PIL_HANDLE_GENER_ADD_PACKED      (1UL << PIL_HANDLE_GENER_SHIFT)
+#endif
+
+// Define various constants related to the data table implementation.
+// TABLE_MIN_OBJECT_COUNT: The minimum capacity for a table.
+// TABLE_MAX_OBJECT_COUNT: The maximum capacity for a table.
+#ifndef PIL_TABLE_CONSTANTS
+#   define PIL_TABLE_CONSTANTS
+#   define PIL_TABLE_MIN_OBJECT_COUNT        1UL
+#   define PIL_TABLE_MAX_OBJECT_COUNT       (1UL << PIL_HANDLE_INDEX_BITS)
+#   define PIL_TABLE_CHUNK_SIZE              1024
+#endif
+
+// Define the well-known allocator tag for host heap memory allocations.
+#ifndef PIL_HEAP_ALLOCATOR_TAG
+#   define PIL_HEAP_ALLOCATOR_TAG                                              PIL_MakeTag('H','E','A','P')
+#endif
+
+// Define the well-known allocator tag for host virtual memory allocations.
+#ifndef PIL_VMM_ALLOCATOR_TAG
+#   define PIL_VMM_ALLOCATOR_TAG                                               PIL_MakeTag('V','M','E','M')
+#endif
+
 // Assign a value to an output argument.
 // _dst: A pointer to the destination location.
 // _val: The value to assign to the destination location.
@@ -440,6 +490,163 @@
     (_disp)->_func == _func##_Stub
 #endif
 
+// Read the number of live items in the table from the PIL_TABLE_INDEX.
+// _x: A pointer to a PIL_TABLE_INDEX structure.
+// Returns the number of live items in the table.
+#ifndef PIL_TableIndex_GetCount
+#define PIL_TableIndex_GetCount(_x)                                            \
+    (_x)->ActiveCount
+#endif
+
+// Read the number of items for which storage is committed from the PIL_TABLE_INDEX.
+// _x: A pointer to a PIL_TABLE_INDEX structure.
+// Returns the number of items that can be stored in the table without increasing the commitment.
+#ifndef PIL_TableIndex_GetCommit
+#define PIL_TableIndex_GetCommit(_x)                                           \
+    (_x)->CommitCount
+#endif
+
+// Read the maximum capacity of a table from the PIL_TABLE_INDEX.
+// _x: A pointer to a PIL_TABLE_INDEX structure.
+// Returns the capacity of the table, in items.
+#ifndef PIL_TableIndex_GetCapacity
+#define PIL_TableIndex_GetCapacity(_x)                                         \
+    (_x)->TableCapacity
+#endif
+
+// Read a handle value from a PIL_TABLE_INDEX.
+// _x: A pointer to a PIL_TABLE_INDEX structure.
+// _i: The zero-based dense index of the handle to read. The dense index is extracted from the sparse index value.
+// Returns the corresponding PIL_HANDLE_BITS.
+#ifndef PIL_TableIndex_GetHandle
+#define PIL_TableIndex_GetHandle(_x, _i)                                       \
+    (_x)->HandleArray[(_i)]
+#endif
+
+// Retrieve the base address of the storage buffer for a PIL_TABLE_DATA.
+// _type: The typename to return.
+// _d: The PIL_TABLE_DATA structure to query.
+// Returns a pointer (_type*) to the first element of the storage buffer.
+#ifndef PIL_TableData_GetBuffer
+#define PIL_TableData_GetBuffer(_type, _d)                                     \
+    (_type*)((_d)->StorageBuffer)
+#endif
+
+// Retrieve the number of bytes between elements in a PIL_TABLE_DATA.
+// _d: The PIL_TABLE_DATA structure to query.
+// Returns the number of bytes between elements.
+#ifndef PIL_TableData_GetElementSize
+#define PIL_TableData_GetElementSize(_d)                                       \
+    (_d)->ElementSize
+#endif
+
+// Retrieve a pointer to the _i'th element in a PIL_TABLE_DATA.
+// _type: The typename to return.
+// _d: The PIL_TABLE_DATA structure to query.
+// _i: The zero-based index of the item to retrieve.
+// Returns a pointer (_type*) to the given element.
+#ifndef PIL_TableData_GetElementPointer
+#define PIL_TableData_GetElementPointer(_type, _d, _i)                         \
+    (_type*)(((uint8_t*)(_d)->StorageBuffer) +((_i) * (_d)->ElementSize))
+#endif
+
+// Retrieve the PIL_TABLE_TYPE for a table.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// Returns one of the values of the PIL_TABLE_TYPE enumeration.
+#ifndef PIL_Table_GetType
+#define PIL_Table_GetType(_td)                                                 \
+    (_td)->TableType
+#endif
+
+// Retrieve the number of active items in a table.
+// _td: A pointer to a PIL_TÁBLE_DESC structure.
+// Returns the number of active items in the table.
+#ifndef PIL_Table_GetCount
+#define PIL_Table_GetCount(_td)                                                \
+    (_td)->Index->ActiveCount
+#endif
+
+// Retrieve the capacity of a table.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// Returns the maximum number of items that can be stored in the table.
+#ifndef PIL_Table_GetCapacity
+#define PIL_Table_GetCapacity(_td)                                             \
+    (_td)->Index->TableCapacity
+#endif
+
+// Retrieve the number of data streams in a table.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// Returns the number of data streams defined for the table.
+#ifndef PIL_Table_GetStreamCount
+#define PIL_Table_GetStreamCount(_td)                                          \
+    (_td)->StreamCount
+#endif
+
+// Retrieve the _ix'th handle for a table.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// _ix: The zero-based index of the item to return.
+// Returns the PIL_HANDLE_BITS for the given item.
+#ifndef PIL_Table_GetHandle
+#define PIL_Table_GetHandle(_td, _ix)                                          \
+    (_td)->Index->HandleArray[(_ix)]
+#endif
+
+// Retrieve a pointer to the first element in the active handle stream for a table.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// Returns a pointer (PIL_HANDLE_BITS*) to the first active identifier in the table. If equal to the address returned by PIL_Table_GetHandleEnd(_td), the table is empty.
+#ifndef PIL_Table_GetHandleBegin
+#define PIL_Table_GetHandleBegin(_td)                                          \
+    (_td)->Index->HandleArray
+#endif
+
+// Retrieve a pointer to one-past the last element in the active handle stream for a table.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// Returns a pointer (PIL_HANDLE_BITS*) to one-past the last active identifier. Do not dereference the returned pointer.
+#ifndef PIL_Table_GetHandleEnd
+#define PIL_Table_GetHandleEnd(_td)                                            \
+   ((_td)->Index->HandleArray + (_td)->Index->ActiveCount)
+#endif
+
+// Retrieve a pointer to the first element in a table data stream.
+// _type: The typename to return.
+// _td: A pointer to a TABLE_DESC structure.
+// _si: The zero-based index of the data stream to query.
+// Returns a pointer to the first active element in the data stream. If equal to the address returned by PIL_Table_GetStreamEnd(_type, _td, _si), the table is empty.
+#ifndef PIL_Table_GetStreamBegin
+#define PIL_Table_GetStreamBegin(_type, _td, _si)                              \
+    ((_type*)((_td)->Streams[(_si)]->StorageBuffer))
+#endif
+
+// Retrieve a pointer to one-past the last element in a table data stream.
+// _type: The typename to return.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// _si: The zero-based index of the data stream to query.
+// Returns a pointer to one-past the last active element in the data stream. Do not dereference the returned pointer.
+#ifndef PIL_Table_GetStreamEnd
+#define PIL_Table_GetStreamEnd(_type, _td, _si)                                \
+    ((_type*)(((uint8_t*)((_td)->Streams[(_si)]->StorageBuffer)) + ((_td)->Streams[(_si)]->ElementSize * (_td)->Index->ActiveCount)))
+#endif
+
+// Retrieve the number of bytes between elements in a table data stream.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// _si: The zero-based index of the data stream to query.
+// Returns the number of bytes between elements in the data stream.
+#ifndef PIL_Table_GetStreamElementSize
+#define PIL_Table_GetStreamElementSize(_td, _si)                               \
+    ((_td)->Streams[(_si)]->ElementSize)
+#endif
+
+// Retrieve a pointer to the _ei'th element in a table data stream.
+// _type: The typename to return.
+// _td: A pointer to a PIL_TABLE_DESC structure.
+// _si: The zero-based index of the data stream to access.
+// _ei: The zero-based index of the item to retrieve.
+// Returns a pointer (_type*) to the given element.
+#ifndef PIL_Table_GetStreamElement
+#define PIL_Table_GetStreamElement(_type, _td, _si, _ei)                       \
+    ((_type*)(((uint8_t*)((_td)->Streams[(_si)]->StorageBuffer)) + ((_td)->Streams[(_si)]->ElementSize * (_ei))))
+#endif
+
 // Forward-declare the types exported from the platform interface layer.
 struct  PIL_CONTEXT;
 struct  PIL_CONTEXT_INIT;                                                      // Defined in platform.h.
@@ -448,6 +655,13 @@ struct  PIL_MEMORY_BLOCK;                                                      /
 struct  PIL_MEMORY_ARENA;                                                      // Defined in platform.h.
 struct  PIL_MEMORY_ARENA_INIT;                                                 // Defined in platform.h.
 struct  PIL_MEMORY_ARENA_MARKER;                                               // Defined in platform.h.
+struct  PIL_TABLE_INDEX;                                                       // Defined in platform.h.
+struct  PIL_TABLE_INIT;                                                        // Defined in platform.h.
+struct  PIL_TABLE_DATA;                                                        // Defined in platform.h.
+struct  PIL_TABLE_DESC;                                                        // Defined in platform.h.
+struct  PIL_TABLE_DATA_STREAM_DESC;                                            // Defined in platform.h.
+
+typedef uint32_t PIL_HANDLE_BITS;                                              // Handles are opaque 32-bit integer values.
 
 typedef int  (*PIL_PFN_Unknown)(void);                                         // Signature for a dynamically-resolved function. The calling code will have to cast the function pointer to its specific type.
 
@@ -457,6 +671,12 @@ typedef enum   PIL_MEMORY_ALLOCATOR_TYPE {                                     /
     PIL_MEMORY_ALLOCATOR_TYPE_HOST_HEAP               =  2UL,                  // The allocator is a host memory allocator, returning address space from the system heap.
     PIL_MEMORY_ALLOCATOR_TYPE_DEVICE                  =  3UL,                  // The allocator is a device memory allocator.
 } PIL_MEMORY_ALLOCATOR_TYPE;
+
+typedef enum   PIL_TABLE_TYPE {                                                // Define the recognized types of data tables.
+    PIL_TABLE_TYPE_INVALID                            =  0UL,                  // This value is invalid and should not be used.
+    PIL_TABLE_TYPE_PRIMARY                            =  1UL,                  // The table stores data associated with primary keys (identifiers are created by the table itself.)
+    PIL_TABLE_TYPE_FOREIGN                            =  2UL,                  // The table stores data associated with foreign keys (identifiers are created by a different table, but can be used to look up items within this table.)
+} PIL_TABLE_TYPE;
 
 typedef enum   PIL_MEMORY_ARENA_FLAGS {                                        // Flags that can be bitwise OR'd to control the behavior of an arena memory allocator.
     PIL_MEMORY_ARENA_FLAGS_NONE                       = (0UL <<  0),           // No flags are specified. Specifying no flags will cause arena creation to fail.
@@ -484,54 +704,91 @@ typedef enum   PIL_DEVICE_MEMORY_ALLOCATION_FLAGS {                            /
 } PIL_DEVICE_MEMORY_ALLOCATION_FLAGS;
 
 typedef union  PIL_ADDRESS_OR_OFFSET {                                         // A union representing either an offset from some base location, or a valid address in the host process address space.
-    uint64_t                 BaseOffset;                                       // The offset value, specified relative to some base location.
-    void                   *HostAddress;                                       // The address in the host process address space.
+    uint64_t                        BaseOffset;                                // The offset value, specified relative to some base location.
+    void                          *HostAddress;                                // The address in the host process address space.
 } PIL_ADDRESS_OR_OFFSET;
 
 typedef struct PIL_CONTEXT_INIT {                                              // 
-    char const         *ApplicationName;                                       // A nul-terminated string specifying a name for the application creating the context.
-    int32_t             AppVersionMajor;                                       // The major version component of the application.
-    int32_t             AppVersionMinor;                                       // The minor version component of the application.
-    int32_t             AppVersionPatch;                                       // The patch version component of the application.
+    char const                *ApplicationName;                                // A nul-terminated string specifying a name for the application creating the context.
+    int32_t                    AppVersionMajor;                                // The major version component of the application.
+    int32_t                    AppVersionMinor;                                // The minor version component of the application.
+    int32_t                    AppVersionPatch;                                // The patch version component of the application.
 } PIL_CONTEXT_INIT;
 
 typedef struct PIL_MEMORY_BLOCK {                                              // Data associated with a host or device memory allocation.
-    uint64_t             BytesCommitted;                                       // The number of bytes that can be accessed by the application.
-    uint64_t              BytesReserved;                                       // The number of bytes of address space reserved by the allocation.
-    uint64_t                BlockOffset;                                       // The byte offset of the start of the allocated region. This value is set for both host and device allocations.
-    uint8_t                *HostAddress;                                       // The address of the allocated region in the host process address space. This value is NULL for device allocations.
-    uint32_t            AllocationFlags;                                       // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS enumeration.
-    uint32_t               AllocatorTag;                                       // The tag of the memory allocator that created the block (produced with PIL_MakeTag).
+    uint64_t                    BytesCommitted;                                // The number of bytes that can be accessed by the application.
+    uint64_t                     BytesReserved;                                // The number of bytes of address space reserved by the allocation.
+    uint64_t                       BlockOffset;                                // The byte offset of the start of the allocated region. This value is set for both host and device allocations.
+    uint8_t                       *HostAddress;                                // The address of the allocated region in the host process address space. This value is NULL for device allocations.
+    uint32_t                   AllocationFlags;                                // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS enumeration.
+    uint32_t                      AllocatorTag;                                // The tag of the memory allocator that created the block (produced with PIL_MakeTag).
 } PIL_MEMORY_BLOCK;
 
 typedef struct PIL_MEMORY_ARENA {                                              // An arena-style memory allocator.
-    char const          *AllocatorName;                                        // A nul-terminated string specifying the name of the allocator. Used for debugging.
-    uint64_t               MemoryStart;                                        // The address or offset of the start of the memory block from which sub-allocations are returned.
-    uint64_t                NextOffset;                                        // The byte offset of the next permanent allocation to return.
-    uint64_t             MaximumOffset;                                        // The maximum value of NextOffset.
-    uint64_t                NbReserved;                                        // The number of bytes of reserved address space.
-    uint64_t               NbCommitted;                                        // The number of bytes of committed address space.
-    uint32_t             AllocatorType;                                        // One of the values of the PIL_MEMORY_ALLOCATOR_TYPE enumeration specifying whether the memory allocator allocates host or device memory.
-    uint32_t              AllocatorTag;                                        // An opaque 32-bit value used to tag allocations from the arena.
-    uint32_t           AllocationFlags;                                        // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS or PIL_DEVICE_MEMORY_ALLOCATION_FLAGS enumeration.
-    uint32_t                ArenaFlags;                                        // One or more bitwise-OR'd values of the PIL_MEMORY_ARENA_FLAGS enumeration.
+    char const                  *AllocatorName;                                // A nul-terminated string specifying the name of the allocator. Used for debugging.
+    uint64_t                       MemoryStart;                                // The address or offset of the start of the memory block from which sub-allocations are returned.
+    uint64_t                        NextOffset;                                // The byte offset of the next permanent allocation to return.
+    uint64_t                     MaximumOffset;                                // The maximum value of NextOffset.
+    uint64_t                        NbReserved;                                // The number of bytes of reserved address space.
+    uint64_t                       NbCommitted;                                // The number of bytes of committed address space.
+    uint32_t                     AllocatorType;                                // One of the values of the PIL_MEMORY_ALLOCATOR_TYPE enumeration specifying whether the memory allocator allocates host or device memory.
+    uint32_t                      AllocatorTag;                                // An opaque 32-bit value used to tag allocations from the arena.
+    uint32_t                   AllocationFlags;                                // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS or PIL_DEVICE_MEMORY_ALLOCATION_FLAGS enumeration.
+    uint32_t                        ArenaFlags;                                // One or more bitwise-OR'd values of the PIL_MEMORY_ARENA_FLAGS enumeration.
 } PIL_MEMORY_ARENA;
 
 typedef struct PIL_MEMORY_ARENA_INIT {                                         // Data used to configure an arena-style memory allocator.
-    char const          *AllocatorName;                                        // A nul-terminated string specifying the name of the allocator. Used for debugging.
-    uint64_t               ReserveSize;                                        // The number of bytes of address space reserved for the memory block.
-    uint64_t             CommittedSize;                                        // The number of bytes of address space committed in the memory block.
-    PIL_ADDRESS_OR_OFFSET  MemoryStart;                                        // The offset or host address of the start of the allocated memory block.
-    uint32_t             AllocatorType;                                        // One of the values of the PIL_MEMORY_ALLOCATOR_TYPE enumeration specifying whether the memory allocator allocates host or device memory.
-    uint32_t              AllocatorTag;                                        // An opaque 32-bit value used to tag allocations from the arena.
-    uint32_t           AllocationFlags;                                        // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS or PIL_DEVICE_MEMORY_ALLOCATION_FLAGS enumeration.
-    uint32_t                ArenaFlags;                                        // One or more bitwise-OR'd values of the PIL_MEMORY_ARENA_FLAGS enumeration.
+    char const                  *AllocatorName;                                // A nul-terminated string specifying the name of the allocator. Used for debugging.
+    uint64_t                       ReserveSize;                                // The number of bytes of address space reserved for the memory block.
+    uint64_t                     CommittedSize;                                // The number of bytes of address space committed in the memory block.
+    PIL_ADDRESS_OR_OFFSET          MemoryStart;                                // The offset or host address of the start of the allocated memory block.
+    uint32_t                     AllocatorType;                                // One of the values of the PIL_MEMORY_ALLOCATOR_TYPE enumeration specifying whether the memory allocator allocates host or device memory.
+    uint32_t                      AllocatorTag;                                // An opaque 32-bit value used to tag allocations from the arena.
+    uint32_t                   AllocationFlags;                                // One or more bitwise-OR'd values of the PIL_HOST_MEMORY_ALLOCATION_FLAGS or PIL_DEVICE_MEMORY_ALLOCATION_FLAGS enumeration.
+    uint32_t                        ArenaFlags;                                // One or more bitwise-OR'd values of the PIL_MEMORY_ARENA_FLAGS enumeration.
 } PIL_MEMORY_ARENA_INIT;
 
 typedef struct PIL_MEMORY_ARENA_MARKER {                                       // Stores the state of an arena allocator at a specific point in time. A marker can be used to roll-back the allocator state to the marked point in time, invalidating all allocations made since that point.
-    struct PIL_MEMORY_ARENA     *Arena;                                        // The PIL_MEMORY_ARENA from which the marker was obtained.
-    uint64_t                     State;                                        // A value encoding the state of the memory arena when the marker was obtained.
+    struct PIL_MEMORY_ARENA             *Arena;                                // The PIL_MEMORY_ARENA from which the marker was obtained.
+    uint64_t                             State;                                // A value encoding the state of the memory arena when the marker was obtained.
 } PIL_MEMORY_ARENA_MARKER;
+
+typedef struct PIL_TABLE_INDEX {                                               // Data associated with an index mapping a 32-bit integer item ID to a dense array index.
+    uint32_t                      *SparseIndex;                                // A fully committed sparse array used to map item handles to indices in PAL_TABLE_DATA and the HandleArray.
+    PIL_HANDLE_BITS               *HandleArray;                                // A partially committed, densely-packed array of the handles associated with each item in the table.
+    uint32_t                       ActiveCount;                                // The number of items in the table that are valid.
+    uint32_t                     HighWatermark;                                // The maximum number of items ever present in the table.
+    uint32_t                       CommitCount;                                // The maximum number of items that can be stored in the table without committing additional memory.
+    uint32_t                     TableCapacity;                                // The maximum capacity of the table, in items.
+} PIL_TABLE_INDEX;
+
+typedef struct PIL_TABLE_DATA {                                                // Describes a buffer used to store tightly-packed item data records in a table. All items in a PIL_TABLE_DATA have the same type, but a table may have more than one associated PIL_TABLE_DATA.
+    uint8_t                     *StorageBuffer;                                // The start of the storage buffer used for storing item data.
+    uint32_t                       ElementSize;                                // The size of the record type stored in the table data.
+    uint32_t                          Reserved;                                // Reserved for future use. Set to zero.
+} PIL_TABLE_DATA;
+
+typedef struct PIL_TABLE_DESC {                                                // Provides access to all of the components of a table.
+    struct PIL_TABLE_INDEX              *Index;                                // The PIL_TABLE_INDEX used to map handles to their corresponding dense array indices.
+    struct PIL_TABLE_DATA            **Streams;                                // The array of densely-packed table data streams. The array has StreamCount entries.
+    uint32_t                       StreamCount;                                // The number of table data stream entries in the Streams array.
+    uint32_t                         TableType;                                // One of the values of the PIL_TABLE_TYPE enumeration.
+} PIL_TABLE_DESC;
+
+typedef struct PIL_TABLE_DATA_STREAM_DESC {                                    // Describes a PIL_TABLE_DATA representing a table data stream.
+    struct PIL_TABLE_DATA                *Data;                                // A pointer to the PIL_TABLE_DATA that owns the data stream.
+    uint32_t                              Size;                                // The size of the record type, in bytes.
+    uint32_t                          Reserved;                                // Reserved for future use. Set to zero.
+} PIL_TABLE_DATA_STREAM_DESC;
+
+typedef struct PIL_TABLE_INIT {                                                // Data used to configure a data table.
+    struct PIL_TABLE_INDEX              *Index;                                // The PIL_TABLE_INDEX used to map handles to their corresponding dense array indices.
+    struct PIL_TABLE_DATA_STREAM_DESC *Streams;                                // An array of StreamCount descriptors of the PIL_TABLE_DATA objects to initialize.
+    uint32_t                       StreamCount;                                // The number of entries in the Streams array.
+    uint32_t                     TableCapacity;                                // The maximum number of items that can be stored in the table.
+    uint32_t                     InitialCommit;                                // The number of items for which storage is committed during table initialization.
+    uint32_t                         TableType;                                // One of the values of the PIL_TABLE_TYPE enumeration.
+} PIL_TABLE_INIT;
 
 #ifdef __cplusplus
 extern "C" {
@@ -837,6 +1094,123 @@ PIL_MemoryArenaResetToMarker
 (
     struct PIL_MEMORY_ARENA        *arena, 
     struct PIL_MEMORY_ARENA_MARKER marker 
+);
+
+// Perform an internal self-consistency check on a PIL_TABLE_INDEX structure.
+// This routine is intended to be used for debugging purposes. In debug builds, asserts fire for validation errors.
+// index: Pointer to a PIL_TABLE_INDEX to validate.
+// Returns non-zero if the index is valid, or zero if the index is corrupted.
+PIL_API(int32_t)
+PIL_ValidateTableIndex
+(
+    struct PIL_TABLE_INDEX *index
+);
+
+// Given a pointer to a data element within a PIL_TABLE_DATA buffer, retrieve the corresponding dense array index if the item.
+// The caller must ensure that element_address points to a valid address within the supplied table data buffer.
+// stream: Pointer to a PIL_TABLE_DATA describing the data buffer containing the item.
+// element_address: A pointer to the start of an element within the table data buffer.
+// Returns the zero-based index of the element.
+PIL_API(uint32_t)
+PIL_TableData_GetElementIndex
+(
+    struct PIL_TABLE_DATA *stream, 
+    void         *element_address
+);
+
+// Allocate resources for a data table.
+// init: Data describing the table structure to initialize.
+// Returns zero if the table is successfully initialized, or non-zero if an error occurred.
+PIL_API(int32_t)
+PIL_TableCreate
+(
+    struct PIL_TABLE_INIT *init
+);
+
+// Ensure that a data table can accomodate a given number of items.
+// If necessary and possible, the table committment is increased to meet the need.
+// table: Pointer to a PIL_TABLE_DESC describing the index and data streams.
+// total_need: The total number of items the caller needs to store in the table (for example, PIL_TableIndex_GetCount() + 1).
+// chunk_size: The chunk size for the table. The committment is increased to an even multiple of this value to reduce the overall number of allocations.
+// Returns non-zero if the table can store at least total_need items, or zero if an error occurred.
+PIL_API(int32_t)
+PIL_TableEnsure
+(
+    struct PIL_TABLE_DESC *table, 
+    uint32_t          total_need, 
+    uint32_t          chunk_size
+);
+
+// Free all resources allocated for a data table.
+// table: Pointer to a PIL_TABLE_DESC describing the table index and data streams.
+PIL_API(void)
+PIL_TableDelete
+(
+    struct PIL_TABLE_DESC *table
+);
+
+// Reset a table back to empty, invalidating all existing item identifiers.
+// The table data should have already had any necessary cleanup performed prior to this call.
+// table: Pointer to a PIL_TABLE_DESC describing the table index and data streams.
+PIL_API(void)
+PIL_TableDropAll
+(
+    struct PIL_TABLE_DESC *table
+);
+
+// Invalidate a single table item identifier.
+// The table data should have already had any necessary cleanup performed prior to this call.
+// The caller is responsible for ensuring that bits represents a valid table item identifier.
+// table: Pointer to a PIL_TABLE_DESC describing the table index and data streams.
+// item : The PIL_HANDLE_BITS identifying the item to drop.
+// Returns the identifier of the item that was moved as a result of the deletion, or PIL_HANDLE_BITS_INVALID if no item was moved.
+PIL_API(PIL_HANDLE_BITS)
+PIL_TableDropOne
+(
+    struct PIL_TABLE_DESC *table, 
+    PIL_HANDLE_BITS         item
+);
+
+// Resolve an item identifier into a record index.
+// The resulting record index can be supplied to PIL_TableData_GetElementPointer to retrieve the item data within a data stream.
+// o_record_index: Pointer to the location to update with the item dense array index.
+// table: Pointer to a PIL_TABLE_DESC describing the table index and data streams.
+// item : The PIL_HANDLE_BITS identifying the item to resolve.
+// Returns non-zero if the item is successfully resolved and o_record_index was set to the item dense array index, or zero if the item identifier is invalid.
+PIL_API(int32_t)
+PIL_TableResolve
+(
+    uint32_t     *o_record_index, 
+    struct PIL_TABLE_DESC *table, 
+    PIL_HANDLE_BITS         item
+);
+
+// Generate a new item identifier and assign it a slot within the table data streams.
+// This operation is valid only on tables of type PIL_TABLE_TYPE_PRIMARY.
+// The caller is responsible for ensuring that the table has sufficient committed capacity using the PIL_TableEnsure function.
+// o_record_index: Pointer to the location to update with the new item's dense array index, which can be supplied to PIL_TableData_GetElementPointer.
+// table: Pointer to a PIL_TABLE_DESC describing the table index and data streams.
+// Returns the identifier of the new item, or PIL_HANDLE_BITS_INVALID if the table is full.
+PIL_API(PIL_HANDLE_BITS)
+PIL_TableCreateId
+(
+    uint32_t     *o_record_index, 
+    struct PIL_TABLE_DESC *table
+);
+
+// Insert a foreign item identifier and assign it a slot within the table data streams.
+// This operation is valid only on tables of type PIL_TABLE_TYPE_FOREIGN.
+// The caller is responsible for ensuring that the table has sufficient committed capacity using the PIL_TableEnsure function.
+// o_record_index: Pointer to the location to update with the new item's dense array index, which can be supplied to PIL_TableData_GetElementPointer.
+// table: Pointer to a PIL_TABLE_DESC describing the table index and data streams.
+// item : The PIL_HANDLE_BITS, created by a call to PIL_TableCreateId on a different table, identifying the item to insert.
+// Returns non-zero if the item is inserted successfully, or zero if the item cannot be inserted.
+PIL_API(int32_t)
+PIL_TableInsertId
+(
+    uint32_t     *o_record_index, 
+    struct PIL_TABLE_DESC *table, 
+    PIL_HANDLE_BITS         item
 );
 
 #ifdef __cplusplus

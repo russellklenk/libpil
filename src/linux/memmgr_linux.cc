@@ -32,7 +32,7 @@ PIL_HostMemoryAllocateHeap
             o_block->BlockOffset     = 0;
             o_block->HostAddress     =(uint8_t*) p;
             o_block->AllocationFlags = PIL_HOST_MEMORY_ALLOCATION_FLAGS_READWRITE | PIL_HOST_MEMORY_ALLOCATION_FLAG_NOGUARD;
-            o_block->AllocatorTag    = PIL_MakeTag('H', 'E', 'A', 'P');
+            o_block->AllocatorTag    = PIL_HEAP_ALLOCATOR_TAG;
         }
     } else {
         // Allocation failed. ret is EINVAL or ENOMEM.
@@ -119,7 +119,7 @@ PIL_HostMemoryReserveAndCommit
         o_block->BlockOffset     = 0;
         o_block->HostAddress     =(uint8_t*) base;
         o_block->AllocationFlags = alloc_flags;
-        o_block->AllocatorTag    = PIL_MakeTag('V','M','E','M');
+        o_block->AllocatorTag    = PIL_VMM_ALLOCATOR_TAG;
     }
     return base;
 
