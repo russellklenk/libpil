@@ -401,7 +401,7 @@
       (((_v) << 56) & 0xFF00000000000000ULL) )
 #endif
 
-// Make an packed 32-bit value from four ASCII characters.
+// Make a packed 32-bit value from four ASCII characters.
 // _a: An ASCII character.
 // _b: An ASCII character. 
 // _c: An ASCII character.
@@ -415,12 +415,48 @@
      ((uint32_t)(uint8_t)(_d) << 24))
 #endif
 
+// Make a packed version number from individual components.
+// _major: The major version component, in [0, 1024).
+// _minor: The minor version component, in [0, 1024).
+// _patch: The patch version component, in [0, 4096).
+// Returns a 32-bit unsigned integer value representing the given version.
+#ifndef PIL_MakeVersion
+#define PIL_MakeVersion(_major, _minor, _patch)                                \
+    ((((uint32_t)(_major) & 0x3FFUL) << 22) |                                  \
+     (((uint32_t)(_minor) & 0x3FFUL) << 12) |                                  \
+      ((uint32_t)(_patch) & 0xFFFUL))
+#endif
+
+// Extract the major component of a packed version number.
+// _packed: A packed version number created with PIL_MakeVersion.
+// Returns the major version number component.
+#ifndef PIL_Version_GetMajor
+#define PIL_Version_GetMajor(_packed)                                          \
+    (((uint32_t)(_packed) >> 22) & 0x3FFUL)
+#endif
+
+// Extract the minor component of a packed version number.
+// _packed: A packed version number created with PIL_MakeVersion.
+// Returns the minor version number component.
+#ifndef PIL_Version_GetMinor
+#define PIL_Version_GetMinor(_packed)                                          \
+    (((uint32_t)(_packed) >> 12) & 0x3FFUL)
+#endif
+
+// Extract the patch component of a packed version number.
+// _packed: A packed version number created with PIL_MakeVersion.
+// Returns the patch version number component.
+#ifndef PIL_Version_GetPatch
+#define PIL_Version_GetPatch(_packed)                                          \
+    (((uint32_t)(_packed) & 0xFFFUL))
+#endif
+
 // Allocate host memory with the correct size and alignment for an instance of a given type from a memory arena.
 // _arena: The PIL_MEMORY_ARENA from which the allocation is being made.
 // _type : A typename, such as int, specifying the type being allocated.
 // Returns a pointer to the start of the allocated memory block, or NULL.
 #ifndef PIL_MemoryArenaAllocateHostType
-#define PIL_MemoryArenaAllocateHostType(_arena, _type)                             \
+#define PIL_MemoryArenaAllocateHostType(_arena, _type)                         \
     ((_type*) PIL_MemoryArenaAllocateHost(NULL, (_arena), sizeof(_type), PIL_ALIGN_OF(_type)))
 #endif
 
@@ -430,7 +466,7 @@
 // _count: The number of elements in the array.
 // Returns a pointer to the start of the allocated memory block, or NULL.
 #ifndef PIL_MemoryArenaAllocateHostArray
-#define PIL_MemoryArenaAllocateHostArray(_arena, _type, _count)                    \
+#define PIL_MemoryArenaAllocateHostArray(_arena, _type, _count)                \
     ((_type*) PIL_MemoryArenaAllocateHost(NULL, (_arena), sizeof(_type) * (_count), PIL_ALIGN_OF(_type)))
 #endif
 
@@ -441,7 +477,7 @@
 // _align: The object alignment, in bytes.
 // Returns a pointer to the start of the allocated memory block, or NULL.
 #ifndef PIL_MemoryArenaAllocateHostArrayRaw
-#define PIL_MemoryArenaAllocateHostArrayRaw(_arena, _objsize, _align, _count)      \
+#define PIL_MemoryArenaAllocateHostArrayRaw(_arena, _objsize, _align, _count)  \
     ((uint8_t*) PIL_MemoryArenaAllocateHost(NULL, (_arena), (_objsize) * (_count), (_align)))
 #endif
 
@@ -450,7 +486,7 @@
 // _count: The number of elements in the array.
 // Returns a pointer to the start of the allocated array, or NULL.
 #ifndef PIL_HostMemoryAllocateHeapArray
-#define PIL_HostMemoryAllocateHeapArray(_type, _count)                             \
+#define PIL_HostMemoryAllocateHeapArray(_type, _count)                         \
     ((_type*) PIL_HostMemoryAllocateHeap(NULL, sizeof(_type) * (_count), PIL_ALIGN_OF(_type)))
 #endif
 
@@ -650,7 +686,7 @@
 // Forward-declare the types exported from the platform interface layer.
 struct  PIL_CONTEXT;
 struct  PIL_CONTEXT_INIT;                                                      // Defined in platform.h.
-struct  PIL_RUNTIME_MODULE;                                                    // Defined in platform/dylib.h.
+struct  PIL_RUNTIME_MODULE;                                                    // Defined in platform_*.h.
 struct  PIL_MEMORY_BLOCK;                                                      // Defined in platform.h.
 struct  PIL_MEMORY_ARENA;                                                      // Defined in platform.h.
 struct  PIL_MEMORY_ARENA_INIT;                                                 // Defined in platform.h.
@@ -660,10 +696,22 @@ struct  PIL_TABLE_INIT;                                                        /
 struct  PIL_TABLE_DATA;                                                        // Defined in platform.h.
 struct  PIL_TABLE_DESC;                                                        // Defined in platform.h.
 struct  PIL_TABLE_DATA_STREAM_DESC;                                            // Defined in platform.h.
+struct  PIL_GPU_DRIVER;                                                        // Defined in platform.h.
+struct  PIL_GPU_DRIVER_INIT;                                                   // Defined in platform.h.
+struct  PIL_GPU_DRIVER_INFO;                                                   // Defined in platform.h.
+struct  PIL_GPU_DRIVER_STATE;                                                  // Opaque type with no definition.
+struct  PIL_GPU_DEVICE;                                                        // Defined in platform.h.
+struct  PIL_GPU_DEVICE_INIT;                                                   // Defined in platform.h.
+struct  PIL_GPU_DEVICE_STATE;                                                  // Opaque type with no definition.
 
 typedef uint32_t PIL_HANDLE_BITS;                                              // Handles are opaque 32-bit integer values.
 
-typedef int  (*PIL_PFN_Unknown)(void);                                         // Signature for a dynamically-resolved function. The calling code will have to cast the function pointer to its specific type.
+typedef int  (*PIL_PFN_Unknown         )(void);                                // Signature for a dynamically-resolved function. The calling code will have to cast the function pointer to its specific type.
+typedef int  (*PIL_PFN_GPU_DriverInit  )(struct PIL_GPU_DRIVER_INIT*, void**); // Signature for a function that initializes a GPU driver.
+typedef void (*PIL_PFN_GPU_DriverShut  )(struct PIL_GPU_DRIVER_STATE*);        // Signature for a function that shuts down a GPU driver.
+typedef int  (*PIL_PFN_GPU_DriverQuery )(struct PIL_GPU_DRIVER_STATE*, struct PIL_GPU_DRIVER_INFO*);         // Signature for a function that retrieves information about available GPUs.
+typedef int  (*PIL_PFN_GPU_DeviceCreate)(struct PIL_GPU_DRIVER_STATE*, struct PIL_GPU_DEVICE_INIT*, void**); // Signature for a function that creates a logical GPU device interface.
+typedef void (*PIL_PFN_GPU_DeviceDelete)(struct PIL_GPU_DRIVER_STATE*, struct PIL_GPU_DEVICE_STATE*);        // Signature for a function that destroys a logical GPU device interface.
 
 typedef enum   PIL_MEMORY_ALLOCATOR_TYPE {                                     // Define the allowed values for memory allocator types. An allocator can manage either host or device memory. Device memory may or may not be visible to the host CPU.
     PIL_MEMORY_ALLOCATOR_TYPE_INVALID                 =  0UL,                  // This value is invalid and should not be used.
@@ -677,6 +725,16 @@ typedef enum   PIL_TABLE_TYPE {                                                /
     PIL_TABLE_TYPE_PRIMARY                            =  1UL,                  // The table stores data associated with primary keys (identifiers are created by the table itself.)
     PIL_TABLE_TYPE_FOREIGN                            =  2UL,                  // The table stores data associated with foreign keys (identifiers are created by a different table, but can be used to look up items within this table.)
 } PIL_TABLE_TYPE;
+
+typedef enum   PIL_GPU_DRIVER_TYPE {                                           // Define the recognized types of GPU drivers.
+    PIL_GPU_DRIVER_TYPE_UNKNOWN                       =  0UL,                  // This value is invalid and should not be used.
+    PIL_GPU_DRIVER_TYPE_PLATFORM_DEFAULT              =  1UL,                  // Select the default GPU driver for the host platform.
+    PIL_GPU_DRIVER_TYPE_VULKAN1                       =  2UL,                  // Use Vulkan 1.x to interface to the GPUs on the host.
+} PIL_GPU_DRIVER_TYPE;
+
+typedef enum   PIL_GPU_DEVICE_ORDINAL {                                        // Define special values that can be supplied for PIL_GPU_DEVICE_INIT::DeviceOrdinal.
+    PIL_GPU_DEVICE_ORDINAL_ANY                        =  -1L,                  // Select the first physical GPU device meeting the application requirements.
+} PIL_GPU_DEVICE_ORDINAL;
 
 typedef enum   PIL_MEMORY_ARENA_FLAGS {                                        // Flags that can be bitwise OR'd to control the behavior of an arena memory allocator.
     PIL_MEMORY_ARENA_FLAGS_NONE                       = (0UL <<  0),           // No flags are specified. Specifying no flags will cause arena creation to fail.
@@ -702,6 +760,24 @@ typedef enum   PIL_DEVICE_MEMORY_ALLOCATION_FLAGS {                            /
     PIL_DEVICE_MEMORY_ALLOCATION_FLAG_COHERENT       = (1UL <<  2),            // The memory should be host CPU cache coherent.
     PIL_DEVICE_MEMORY_ALLOCATION_FLAG_WRITE_COMBINED = (1UL <<  3),            // The memory should be write-combined.
 } PIL_DEVICE_MEMORY_ALLOCATION_FLAGS;
+
+typedef enum   PIL_GPU_DRIVER_FEATUE_FLAGS {                                   // Flags that can be bitwise OR'd to define GPU driver selection requirements or capabilities.
+    PIL_GPU_DRIVER_FEATURE_FLAGS_NONE                = (0UL <<  0),            // The driver is not supported on the host system.
+    PIL_GPU_DRIVER_FEATURE_FLAG_DEBUG                = (1UL <<  0),            // The driver supports debugging features at some cost in performance.
+    PIL_GPU_DRIVER_FEATURE_FLAG_COMPUTE              = (1UL <<  1),            // The driver supports creating GPU compute engine interfaces.
+    PIL_GPU_DRIVER_FEATURE_FLAG_DISPLAY              = (1UL <<  2),            // The driver supports creating GPU display engine interfaces.
+    PIL_GPU_DRIVER_FEATURE_FLAG_PRESENT              = (1UL <<  3),            // The driver supports creating GPU presentation engine interfaces.
+} PIL_GPU_DRIVER_FEATURE_FLAGS;
+
+typedef enum   PIL_GPU_DEVICE_FEATURE_FLAGS {                                  // Flags that can be bitwise OR'd to define GPU device selection requirements or capabilities.
+    PIL_GPU_DEVICE_FEATURE_FLAGS_NONE                = (0UL <<  0),            // No flags are specified. Device creation will always fail.
+    PIL_GPU_DEVICE_FEATURE_FLAG_COMPUTE              = (1UL <<  0),            // Device selection will consider only GPUs that support compute capability.
+    PIL_GPU_DEVICE_FEATURE_FLAG_DISPLAY              = (1UL <<  1),            // Device selection will consider only GPUs that support display capability.
+    PIL_GPU_DEVICE_FEATURE_FLAG_PRESENT              = (1UL <<  2),            // Device selection will consider only GPUs that support presentation capability.
+    PIL_GPU_DEVICE_FEATURE_FLAG_DISCRETE             = (1UL <<  3),            // Device selection will consider discrete GPUs.
+    PIL_GPU_DEVICE_FEATURE_FLAG_INTEGRATED           = (1UL <<  4),            // Device selection will consider integrated GPUs.
+    PIL_GPU_DEVICE_FEATURE_FLAG_EXCLUSIVE            = (1UL <<  5),            // Device creation should fail if the selected GPU already has an active logical device.
+} PIL_GPU_DEVICE_FEATURE_FLAGS;
 
 typedef union  PIL_ADDRESS_OR_OFFSET {                                         // A union representing either an offset from some base location, or a valid address in the host process address space.
     uint64_t                        BaseOffset;                                // The offset value, specified relative to some base location.
@@ -789,6 +865,40 @@ typedef struct PIL_TABLE_INIT {                                                /
     uint32_t                     InitialCommit;                                // The number of items for which storage is committed during table initialization.
     uint32_t                         TableType;                                // One of the values of the PIL_TABLE_TYPE enumeration.
 } PIL_TABLE_INIT;
+
+typedef struct PIL_GPU_DRIVER {                                                // The dispatch table used to interface with a GPU driver.
+    struct PIL_GPU_DRIVER_STATE         *State;                                // Internal state allocated by the GPU driver.
+    PIL_PFN_GPU_DriverInit        DriverInitFn;                                // The function used to create and initialize a GPU driver interface.
+    PIL_PFN_GPU_DriverShut        DriverShutFn;                                // The function used to shutdown and free resources allocated by a GPU driver interface.
+    PIL_PFN_GPU_DriverQuery      DriverQueryFn;                                // The function used to query for supported GPUs and capabilities on the host system.
+    PIL_PFN_GPU_DeviceCreate    DeviceCreateFn;                                // The function used to create and initialize a logical GPU device.
+    PIL_PFN_GPU_DeviceDelete    DeviceDeleteFn;                                // The function used to free resources and shutdown a logical GPU device.
+} PIL_GPU_DRIVER;
+
+typedef struct PIL_GPU_DRIVER_INIT {                                           // Data used to configure the creation of a GPU driver interface.
+    uint32_t                  RequiredFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DRIVER_FEATURE_FLAGS enumeration specifying features required by the application.
+    uint32_t                    MaxDeviceCount;                                // The maximum number of logical GPU devices that will be created by the application.
+} PIL_GPU_DRIVER_INIT;
+
+typedef struct PIL_GPU_DRIVER_INFO {                                           // Data providing basic information about a GPU driver and its capabilities.
+    uint32_t                     DriverVersion;                                // The packed version of the GPU driver, created with PIL_MakeVersion. Use the PIL_Version_GetYYYYY macros to extract individual components.
+    uint32_t                       DeviceCount;                                // The number of physical GPUs supporting the GPU driver interface installed in the host system.
+    uint32_t                 SupportedFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DRIVER_FEATURE_FLAGS enumeration specifying features available to the application.
+    char                       DriverName[128];                                // A nul-terminated ASCII string, suitable for display, describing the driver.
+} PIL_GPU_DRIVER_INFO;
+
+typedef struct PIL_GPU_DEVICE {                                                // The dispatch table used to interface with a GPU device.
+    struct PIL_GPU_DEVICE_STATE   *DeviceState;                                // Internal state allocated by the logical GPU device.
+    struct PIL_GPU_DRIVER_STATE   *DriverState;                                // Internal state allocated by the GPU driver.
+    uint32_t                     DeviceOrdinal;                                // The zero-based index of the physical device bound to the logical GPU device interface.
+    uint32_t                 SupportedFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DEVICE_FEATURE_FLAGS enumeration specifying the features supported by the device.
+    // ... resource creation
+} PIL_GPU_DEVICE;
+
+typedef struct PIL_GPU_DEVICE_INIT {                                           // Data used to configure the creation of a logical GPU device.
+    uint32_t                  RequiredFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DEVICE_FEATURE_FLAGS enumeration specifying the features required by the application.
+    int32_t                      DeviceOrdinal;                                // The zero-based index of the physical device to use, or PIL_GPU_DEVICE_ORDINAL_ANY to select any device meeting the feature requirements.
+} PIL_GPU_DEVICE_INIT;
 
 #ifdef __cplusplus
 extern "C" {
@@ -1211,6 +1321,31 @@ PIL_TableInsertId
     uint32_t     *o_record_index, 
     struct PIL_TABLE_DESC *table, 
     PIL_HANDLE_BITS         item
+);
+
+// Open a connection to a GPU interface on the host and retrieve information about available GPUs.
+// driver: The PIL_GPU_DRIVER structure to populate.
+// config: Information about the application and its GPU requirements.
+// driver_info: Pointer to a PIL_GPU_DRIVER_INFO structure to populate with information about the physical GPUs available on the host.
+// driver_type: One of the values of the PIL_GPU_DRIVER_TYPE enumeration indicating the type of driver to use for GPU access.
+// Returns zero if the driver interface is available on the host, or non-zero if an error occurred.
+PIL_API(int32_t)
+PIL_GpuDriverOpen
+(
+    struct PIL_GPU_DRIVER           *driver, 
+    struct PIL_GPU_DRIVER_INIT      *config, 
+    struct PIL_GPU_DRIVER_INFO *driver_info, 
+    PIL_GPU_DRIVER_TYPE         driver_type
+);
+
+// Close a connection to a GPU interface on the host.
+// Any logical devices should be deleted prior to closing the driver.
+// Any resources allocated by the driver are freed when the driver is closed.
+// driver: The PIL_GPU_DRIVER representing the driver interface to close.
+PIL_API(void)
+PIL_GpuDriverClose
+(
+    struct PIL_GPU_DRIVER *driver
 );
 
 #ifdef __cplusplus
