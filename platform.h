@@ -295,6 +295,15 @@
 #   define PIL_UTF32_MAX_BYTES_PER_CODEPOINT 4
 #endif
 
+// Define various constants used internally within this module.
+// PIL_LINUX_PATH_STRING_MAX_CHARS: The maximum number of characters in a Linux-style path string, not including the nul-terminator.
+// PIL_WIN32_PATH_STRING_MAX_CHARS: The maximum number of characters in a Win32-style path string, not including the nul-terminator.
+#ifndef PIL_PATH_CONSTANTS
+#   define PIL_PATH_CONSTANTS
+#   define PIL_LINUX_PATH_STRING_MAX_CHARS   4095
+#   define PIL_WIN32_PATH_STRING_MAX_CHARS   4095
+#endif
+
 // Define the well-known allocator tag for host heap memory allocations.
 #ifndef PIL_HEAP_ALLOCATOR_TAG
 #   define PIL_HEAP_ALLOCATOR_TAG                                              PIL_MakeTag('H','E','A','P')
@@ -790,6 +799,20 @@ typedef enum   PIL_DEVICE_MEMORY_ALLOCATION_FLAGS {                            /
     PIL_DEVICE_MEMORY_ALLOCATION_FLAG_WRITE_COMBINED = (1UL <<  3),            // The memory should be write-combined.
 } PIL_DEVICE_MEMORY_ALLOCATION_FLAGS;
 
+typedef enum   PIL_PATH_FLAGS {                                                // Flags that can be bitwise OR'd to specify the valid fields of a path.
+    PIL_PATH_FLAGS_NONE                              = (0UL <<  0),            // The path string does not have any components.
+    PIL_PATH_FLAG_INVALID                            = (1UL <<  0),            // The path string does not specify a valid path.
+    PIL_PATH_FLAG_ABSOLUTE                           = (1UL <<  1),            // The path string specifies an absolute path.
+    PIL_PATH_FLAG_RELATIVE                           = (1UL <<  2),            // The path string specifies a relative path.
+    PIL_PATH_FLAG_NETWORK                            = (1UL <<  3),            // The path string is a Win32 UNC share path.
+    PIL_PATH_FLAG_DEVICE                             = (1UL <<  4),            // The path string is a Win32 device path.
+    PIL_PATH_FLAG_LONG                               = (1UL <<  5),            // The path string is a Win32 long path (starts with "\\?\").
+    PIL_PATH_FLAG_ROOT                               = (1UL <<  6),            // The path string has a root or drive letter component.
+    PIL_PATH_FLAG_DIRECTORY                          = (1UL <<  7),            // The path string has a directory tree component.
+    PIL_PATH_FLAG_FILENAME                           = (1UL <<  8),            // The path string has a filename component.
+    PIL_PATH_FLAG_EXTENSION                          = (1UL <<  9),            // The path string has a file extension component.
+} PIL_PATH_FLAGS;
+
 typedef enum   PIL_GPU_DEVICE_FEATURE_FLAGS {                                  // Flags that can be bitwise OR'd to define GPU device selection requirements or capabilities.
     PIL_GPU_DEVICE_FEATURE_FLAGS_NONE                = (0UL <<  0),            // No flags are specified. Device creation will always fail.
     PIL_GPU_DEVICE_FEATURE_FLAG_DEBUG                = (1UL <<  0),            // Device interface debugging features should be enabled.
@@ -858,6 +881,30 @@ typedef struct PIL_STRING_INFO {                                               /
     size_t                         LengthBytes;                                // The length of the string buffer, in bytes, including the terminating nul.
     size_t                         LengthChars;                                // The length of the string buffer, in codepoints, not including the terminating nul.
 } PIL_STRING_INFO;
+
+typedef struct PIL_PATH_PARTS_LINUX {                                          // Path components for a Linux-style path string, which is nul-terminated and ITF-8 encoded.
+    char                                 *Root;                                // A pointer to the first character of the path root.
+    char                              *RootEnd;                                // A pointer to one-past the last character of the path root component.
+    char                                 *Path;                                // A pointer to the first character of the directory tree component.
+    char                              *PathEnd;                                // A pointer to one-past the last character of the directory tree component.
+    char                             *Filename;                                // A pointer to the first character of the filename component.
+    char                          *FilenameEnd;                                // A pointer to one-past the last character of the filename component.
+    char                            *Extension;                                // A pointer to the first character of the file extension component.
+    char                         *ExtensionEnd;                                // A pointer to one-past the last character of the file extension component.
+    uint32_t                         PathFlags;                                // One or more bitwise-OR'd values of the PIL_PATH_FLAGS enumeration.
+} PIL_PATH_PARTS_LINUX;
+
+typedef struct PIL_PATH_PARTS_WIN32 {                                          // Path components for a Windows-style path string, which is nul-terminated and UTF-16 encoded and may specify a file path, device path or UNC path.
+    char                                 *Root;                                // A pointer to the first character of the path root.
+    char                              *RootEnd;                                // A pointer to one-past the last character of the path root component.
+    char                                 *Path;                                // A pointer to the first character of the directory tree component.
+    char                              *PathEnd;                                // A pointer to one-past the last character of the directory tree component.
+    char                             *Filename;                                // A pointer to the first character of the filename component.
+    char                          *FilenameEnd;                                // A pointer to one-past the last character of the filename component.
+    char                            *Extension;                                // A pointer to the first character of the file extension component.
+    char                         *ExtensionEnd;                                // A pointer to one-past the last character of the file extension component.
+    uint32_t                         PathFlags;                                // One or more bitwise-OR'd values of the PIL_PATH_FLAGS enumeration.
+} PIL_PATH_PARTS_WIN32;
 
 typedef struct PIL_TABLE_INDEX {                                               // Data associated with an index mapping a 32-bit integer item ID to a dense array index.
     uint32_t                      *SparseIndex;                                // A fully committed sparse array used to map item handles to indices in PAL_TABLE_DATA and the HandleArray.
@@ -1538,6 +1585,126 @@ PIL_Base64Decode
     size_t                     max_dst,
     void const * PIL_RESTRICT      src,
     size_t                     num_src
+);
+
+// Retrieve the maximum number of characters in a Linux-style path string.
+// Returns the maximum number of characters in a Linux-style path string, not including the terminating nul.
+PIL_API(size_t)
+PIL_LinuxPathStringMaxChars
+(
+    void
+);
+
+// Retrieve the maximum number of characters in a Win32-style path string.
+// Returns The maximum number of characters in a Win32-style path string, not including the terminating nul.
+PIL_API(size_t)
+PIL_Win32PathStringMaxChars
+(
+    void
+);
+
+// Allocate a buffer for manipulating a Linux-style path string and optionally initialize the contents with an existing string.
+// The buffer can hold up to the number of characters returned by the PIL_LinuxPathStringMaxChars function, plus one for the terminating nul.
+// o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned string.
+// o_bufinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned buffer.
+// strinfo  : Pointer to an optional PIL_STRING_INFO that if supplied contains information about the string pointed to by strbuf.
+// strbuf   : Pointer to an optional UTF-8 encoded, nul-terminated string that will be used as the initial contents of the new buffer.
+// Returns a pointer to the start of the allocated buffer, or NULL if memory allocation failed.
+PIL_API(char*)
+PIL_LinuxPathBufferCreate
+(
+    struct PIL_STRING_INFO *o_strinfo,
+    struct PIL_STRING_INFO *o_bufinfo,
+    struct PIL_STRING_INFO   *strinfo,
+    char const                *strbuf
+);
+
+// Allocate a buffer for manipulating a Win32-style path string and optionally initialize the contents with an existing string.
+// The buffer can hold up to the number of characters returned by the PIL_Win32PathStringMaxChars function, plus one for the terminating nul.
+// o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned string.
+// o_bufinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned buffer.
+// strinfo  : Pointer to an optional PIL_STRING_INFO that if supplied contains information about the string pointed to by strbuf.
+// strbuf   : Pointer to an optional UTF-16 encoded, nul-terminated string that will be used as the initial contents of the new buffer.
+// Returns A pointer to the start of the allocated buffer, or NULL if memory allocation failed.
+PIL_API(char*)
+PIL_Win32PathBufferCreate
+(
+    struct PIL_STRING_INFO *o_strinfo,
+    struct PIL_STRING_INFO *o_bufinfo,
+    struct PIL_STRING_INFO   *strinfo,
+    char const                *strbuf
+);
+
+// Free a path buffer returned by the PIL_LinuxPathBufferCreate or PIL_Win32PathBufferCreate functions.
+// pathbuf The path buffer to free.
+PIL_API(void)
+PIL_PathBufferDelete
+(
+    void *pathbuf
+);
+
+// Parse a Linux-style path string into its constituient parts.
+// o_parts  : The PIL_PATH_PARTS_LINUX structure to populate.
+// o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the input string.
+// strinfo  : Optional information about the input string strbuf that, if supplied, is used as an optimization.
+// strbuf   : A pointer to the start of the nul-terminated, UTF-8 encoded path string to parse.
+// Returns zero if the path string is parsed successfully, or non-zero if an error occurred.
+PIL_API(int32_t)
+PIL_LinuxPathStringParse
+(
+    struct PIL_PATH_PARTS_LINUX *o_parts,
+    struct PIL_STRING_INFO    *o_strinfo,
+    struct PIL_STRING_INFO      *strinfo,
+    char const                   *strbuf
+);
+
+// Parse a Win32-style path string into its constituient parts.
+// o_parts  : The PATH_PARTS_WIN32 structure to populate.
+// o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the input string.
+// strinfo  : Optional information about the input string strbuf that, if supplied, is used as an optimization.
+// strbuf   : A pointer to the start of the nul-terminated, UTF-16 encoded path string to parse.
+// Returns zero if the path string is parsed successfully, or non-zero if an error occurred.
+PIL_API(int32_t)
+PIL_Win32PathStringParse
+(
+    struct PIL_PATH_PARTS_WIN32 *o_parts,
+    struct PIL_STRING_INFO    *o_strinfo,
+    struct PIL_STRING_INFO      *strinfo,
+    char const                   *strbuf
+);
+
+// Append one path fragment to another.
+// o_dstinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the destination string buffer after the path fragment is appended.
+// dstinfo  : Optional information about the destination string buffer dstbuf that, if supplied, is used as an optimization.
+// appinfo  : Optional information about the path fragment to append that, if supplied, is used as an optimization.
+// dstbuf   : The buffer, returned by PIL_LinuxPathBufferCreate, to which the path fragment will be appended. If this value is null, a new path buffer is allocated and initialized with the contents of appstr.
+// appstr   : The path fragment to append to the path fragment stored in dstbuf.
+// Returns a pointer to the destination path buffer (or the allocated path buffer, if dstbuf is null), or null if an error occurred.
+PIL_API(char*)
+PIL_LinuxPathBufferAppend
+(
+    struct PIL_STRING_INFO *o_dstinfo,
+    struct PIL_STRING_INFO   *dstinfo,
+    struct PIL_STRING_INFO   *appinfo,
+    char                      *dstbuf,
+    char const                *appstr
+);
+
+// Append one path fragment to another.
+// o_dstinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the destination string buffer after the path fragment is appended.
+// dstinfo  : Optional information about the destination string buffer dstbuf that, if supplied, is used as an optimization.
+// appinfo  : Optional information about the path fragment to append that, if supplied, is used as an optimization.
+// dstbuf   : The buffer, returned by PIL_Win32PathBufferCreate, to which the path fragment will be appended. If this value is null, a new path buffer is allocated and initialized with the contents of appstr.
+// appstr   : The path fragment to append to the path fragment stored in dstbuf.
+// Returns a pointer to the destination path buffer (or the allocated path buffer, if dstbuf is null), or null if an error occurred.
+PIL_API(char*)
+PIL_Win32PathBufferAppend
+(
+    struct PIL_STRING_INFO *o_dstinfo,
+    struct PIL_STRING_INFO   *dstinfo,
+    struct PIL_STRING_INFO   *appinfo,
+    char                      *dstbuf,
+    char const                *appstr
 );
 
 // Perform an internal self-consistency check on a PIL_TABLE_INDEX structure.
