@@ -278,6 +278,23 @@
 #   define PIL_TABLE_CHUNK_SIZE              1024
 #endif
 
+// Define various constants used internally within this module.
+// PIL_UTF8_NUL_BYTES               : The number of bytes used for a nul-terminator in a UTF-8 encoded string.
+// PIL_UTF16_NUL_BYTES              : The number of bytes used for a nul-terminator in a UTF-16 encoded string.
+// PIL_UTF32_NUL_BYTES              : The number of bytes used for a nul-terminator in a UTF-32 encoded string.
+// PIL_UTF8_MAX_BYTES_PER_CODEPOINT : The maximum number of bytes that may be used to encode a valid codepoint in a UTF-8 encoded string.
+// PIL_UTF16_MAX_BYTES_PER_CODEPOINT: The maximum number of bytes that may be used to encode a valid codepoint in a UTF-16 encoded string.
+// PIL_UTF32_MAX_BYTES_PER_CODEPOINT: The maximum number of bytes that may be used to encode a valid codepoint in a UTF-32 encoded string.
+#ifndef PIL_STRING_CONSTANTS
+#   define PIL_STRING_CONSTANTS
+#   define PIL_UTF8_NUL_BYTES                1
+#   define PIL_UTF16_NUL_BYTES               2
+#   define PIL_UTF32_NUL_BYTES               4
+#   define PIL_UTF8_MAX_BYTES_PER_CODEPOINT  4
+#   define PIL_UTF16_MAX_BYTES_PER_CODEPOINT 4
+#   define PIL_UTF32_MAX_BYTES_PER_CODEPOINT 4
+#endif
+
 // Define the well-known allocator tag for host heap memory allocations.
 #ifndef PIL_HEAP_ALLOCATOR_TAG
 #   define PIL_HEAP_ALLOCATOR_TAG                                              PIL_MakeTag('H','E','A','P')
@@ -293,7 +310,7 @@
 // _val: The value to assign to the destination location.
 #ifndef PIL_Assign
 #define PIL_Assign(_dst, _val)                                                 \
-    if ((_dst)) *(_dst) = (_val) 
+    if ((_dst))  *(_dst) = (_val) 
 #endif
 
 // Calculate the number of items in a fixed-length array.
@@ -454,20 +471,20 @@
 // Allocate host memory with the correct size and alignment for an instance of a given type from a memory arena.
 // _arena: The PIL_MEMORY_ARENA from which the allocation is being made.
 // _type : A typename, such as int, specifying the type being allocated.
-// Returns a pointer to the start of the allocated memory block, or NULL.
+// Returns a pointer to the start of the allocated memory block, or null.
 #ifndef PIL_MemoryArenaAllocateHostType
 #define PIL_MemoryArenaAllocateHostType(_arena, _type)                         \
-    ((_type*) PIL_MemoryArenaAllocateHost(NULL, (_arena), sizeof(_type), PIL_ALIGN_OF(_type)))
+    ((_type*) PIL_MemoryArenaAllocateHost(nullptr, (_arena), sizeof(_type), PIL_ALIGN_OF(_type)))
 #endif
 
 // Allocate memory with the correct size and alignment for an array of instance of a given type from a memory arena.
 // _arena: The PIL_MEMORY_ARENA from which the allocation is being made.
 // _type : A typename, such as int, specifying the type being allocated.
 // _count: The number of elements in the array.
-// Returns a pointer to the start of the allocated memory block, or NULL.
+// Returns a pointer to the start of the allocated memory block, or null.
 #ifndef PIL_MemoryArenaAllocateHostArray
 #define PIL_MemoryArenaAllocateHostArray(_arena, _type, _count)                \
-    ((_type*) PIL_MemoryArenaAllocateHost(NULL, (_arena), sizeof(_type) * (_count), PIL_ALIGN_OF(_type)))
+    ((_type*) PIL_MemoryArenaAllocateHost(nullptr, (_arena), sizeof(_type) * (_count), PIL_ALIGN_OF(_type)))
 #endif
 
 // Allocate memory with the given object size and alignment for an array of object data from a memory arena.
@@ -475,19 +492,19 @@
 // _objsize: The object size, in bytes.
 // _count: The number of elements in the array.
 // _align: The object alignment, in bytes.
-// Returns a pointer to the start of the allocated memory block, or NULL.
+// Returns a pointer to the start of the allocated memory block, or null.
 #ifndef PIL_MemoryArenaAllocateHostArrayRaw
 #define PIL_MemoryArenaAllocateHostArrayRaw(_arena, _objsize, _align, _count)  \
-    ((uint8_t*) PIL_MemoryArenaAllocateHost(NULL, (_arena), (_objsize) * (_count), (_align)))
+    ((uint8_t*) PIL_MemoryArenaAllocateHost(nullptr, (_arena), (_objsize) * (_count), (_align)))
 #endif
 
 // Allocate a fixed-size array on the system heap.
 // _type : A typename, such as int, specifying the type being allocated.
 // _count: The number of elements in the array.
-// Returns a pointer to the start of the allocated array, or NULL.
+// Returns a pointer to the start of the allocated array, or null.
 #ifndef PIL_HostMemoryAllocateHeapArray
 #define PIL_HostMemoryAllocateHeapArray(_type, _count)                         \
-    ((_type*) PIL_HostMemoryAllocateHeap(NULL, sizeof(_type) * (_count), PIL_ALIGN_OF(_type)))
+    ((_type*) PIL_HostMemoryAllocateHeap(nullptr, sizeof(_type) * (_count), PIL_ALIGN_OF(_type)))
 #endif
 
 // Helper macro for populating a dispatch table with functions loaded at runtime.
@@ -503,7 +520,7 @@
 #define PIL_RuntimeFunctionResolve(_disp, _module, _func)                      \
     for (;;) {                                                                 \
         (_disp)->_func=(PFN_##_func)PIL_RuntimeModuleResolve((_module),#_func);\
-        if ((_disp)->_func == NULL) {                                          \
+        if ((_disp)->_func == nullptr) {                                       \
             (_disp)->_func  = _func##_Stub;                                    \
         } break;                                                               \
     }
@@ -691,6 +708,7 @@ struct  PIL_MEMORY_BLOCK;                                                      /
 struct  PIL_MEMORY_ARENA;                                                      // Defined in platform.h.
 struct  PIL_MEMORY_ARENA_INIT;                                                 // Defined in platform.h.
 struct  PIL_MEMORY_ARENA_MARKER;                                               // Defined in platform.h.
+struct  PIL_STRING_INFO;                                                       // Defined in platform.h.
 struct  PIL_TABLE_INDEX;                                                       // Defined in platform.h.
 struct  PIL_TABLE_INIT;                                                        // Defined in platform.h.
 struct  PIL_TABLE_DATA;                                                        // Defined in platform.h.
@@ -710,6 +728,15 @@ typedef enum   PIL_MEMORY_ALLOCATOR_TYPE {                                     /
     PIL_MEMORY_ALLOCATOR_TYPE_HOST_HEAP               =  2UL,                  // The allocator is a host memory allocator, returning address space from the system heap.
     PIL_MEMORY_ALLOCATOR_TYPE_DEVICE                  =  3UL,                  // The allocator is a device memory allocator.
 } PIL_MEMORY_ALLOCATOR_TYPE;
+
+typedef enum PIL_TEXT_ENCODING {                                               // Define constants for different text encodings that can be determined by inspecting the first four bytes of a byte-order marker.
+    PIL_TEXT_ENCODING_UNSURE                          =  0UL,                  // The text encoding is not known or could not be determined.
+    PIL_TEXT_ENCODING_UTF8                            =  1UL,                  // The text encoding was determined to be UTF-8.
+    PIL_TEXT_ENCODING_UTF16_MSB                       =  2UL,                  // The text encoding was determined to be UTF-16 with the most-significant bit first (big endian).
+    PIL_TEXT_ENCODING_UTF16_LSB                       =  3UL,                  // The text encoding was determined to be UTF-16 with the least-significant bit first (little endian).
+    PIL_TEXT_ENCODING_UTF32_MSB                       =  4UL,                  // The text encoding was determined to be UTF-32 with the most-significant bit first (big endian).
+    PIL_TEXT_ENCODING_UTF32_LSB                       =  5UL,                  // The text encoding was determined to be UTF-32 with the least-significant bit first (little endian).
+} PIL_TEXT_ENCODING;
 
 typedef enum   PIL_TABLE_TYPE {                                                // Define the recognized types of data tables.
     PIL_TABLE_TYPE_INVALID                            =  0UL,                  // This value is invalid and should not be used.
@@ -824,6 +851,13 @@ typedef struct PIL_MEMORY_ARENA_MARKER {                                       /
     struct PIL_MEMORY_ARENA             *Arena;                                // The PIL_MEMORY_ARENA from which the marker was obtained.
     uint64_t                             State;                                // A value encoding the state of the memory arena when the marker was obtained.
 } PIL_MEMORY_ARENA_MARKER;
+
+typedef struct PIL_STRING_INFO {                                               // Commonly-needed data about a UTF-8 encoded string.
+    char                               *Buffer;                                // Points to the start of the string buffer.
+    char                            *BufferEnd;                                // Points to one byte past the terminating nul byte of the string buffer.
+    size_t                         LengthBytes;                                // The length of the string buffer, in bytes, including the terminating nul.
+    size_t                         LengthChars;                                // The length of the string buffer, in codepoints, not including the terminating nul.
+} PIL_STRING_INFO;
 
 typedef struct PIL_TABLE_INDEX {                                               // Data associated with an index mapping a 32-bit integer item ID to a dense array index.
     uint32_t                      *SparseIndex;                                // A fully committed sparse array used to map item handles to indices in PAL_TABLE_DATA and the HandleArray.
@@ -995,7 +1029,7 @@ PIL_HashData64
 // o_block: Pointer to a MEMORY_BLOCK to populate with information about the allocation.
 // n_bytes: The minimum number of bytes to allocate.
 // alignment: The required alignment, in bytes. The PIL_AlignOf(T) macro can be used to obtain the necessary alignment for a given type. 
-// Returns a pointer to the start of the aligned memory block, or NULL if the allocation request could not be satisfied.
+// Returns a pointer to the start of the aligned memory block, or null if the allocation request could not be satisfied.
 PIL_API(void*)
 PIL_HostMemoryAllocateHeap
 (
@@ -1018,7 +1052,7 @@ PIL_HostMemoryFreeHeap
 // reserve_bytes: The number of bytes of process address space to reserve.
 // commit_bytes: The number of bytes of process address space to commit. This value can be zero.
 // alloc_flags: One or more bitwise OR'd values from the PIL_HOST_MEMORY_ALLOCATION_FLAGS enumeration.
-// Returns a pointer to the start of the reserved address space, or NULL if the allocation could not be satisfied.
+// Returns a pointer to the start of the reserved address space, or null if the allocation could not be satisfied.
 PIL_API(void*)
 PIL_HostMemoryReserveAndCommit
 (
@@ -1171,13 +1205,339 @@ PIL_MemoryArenaReset
 
 // Reset the state of the memory arena back to a previously obtained marker.
 // This invalidates all allocations from the arena made since the marker was obtained.
-// arena: The PIL_MEMORY_ARENA to reset.
+// arena : The PIL_MEMORY_ARENA to reset.
 // marker: The marker representing the reset point.
 PIL_API(void)
 PIL_MemoryArenaResetToMarker
 (
     struct PIL_MEMORY_ARENA        *arena, 
     struct PIL_MEMORY_ARENA_MARKER marker 
+);
+
+// Retrieve the byte order marker for a given PIL_TEXT_ENCODING constant.
+// o_marker     : Pointer to an array of at least four bytes to receive the byte order marker.
+// text_encoding: One of the values of the PIL_TEXT_ENCODING enumeration specifying the encoding for which the byte order marker is being queried.
+// Returns the number of bytes in the byte order marker written to the o_marker array.
+PIL_API(size_t)
+PIL_ByteOrderMarkerForEncoding
+(
+    uint8_t      *o_marker,
+    uint32_t text_encoding
+);
+
+// Given four bytes possibly representing a Unicode byte order marker, attempt to determine the text encoding and size of the byte order marker.
+// o_bytecount: On return, this location is updated with the number of bytes in the byte order marker.
+// marker     : Pointer to an array of four bytes representing a possible byte order marker. Data less than four bytes should be padded with zeroes.
+// Returns one of the values of the PIL_TEXT_ENCODING enumeration.
+PIL_API(PIL_TEXT_ENCODING)
+PIL_EncodingForByteOrderMarker
+(
+    size_t   *o_bytecount,
+    uint8_t const *marker
+);
+
+// Allocate a buffer for storing UTF-8 encoded characters and optionally initialize the contents with an existing string.
+// o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned string.
+// o_bufinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned buffer.
+// strinfo  : Pointer to an optional PIL_STRING_INFO that if supplied contains information about the string pointed to by strbuf.
+// max_chars: The maximum number of characters that can be stored in the buffer, not including the terminating nul.
+// This parameter can be used to allocate a buffer larger than an existing buffer that is initialized with the contents of the existing buffer.
+// Specify zero for max_chars to allocate a buffer the same size as the supplied initial string strbuf.
+// strbuf   : Pointer to an optional UTF-8 encoded, nul-terminated string that will be used as the initial contents of the new buffer.
+// Returns a pointer to the start of the allocated buffer, or null if memory allocation failed.
+PIL_API(char*)
+PIL_Utf8StringCreate
+(
+    struct PIL_STRING_INFO *o_strinfo,
+    struct PIL_STRING_INFO *o_bufinfo,
+    struct PIL_STRING_INFO   *strinfo,
+    size_t                  max_chars,
+    char const                *strbuf
+);
+
+// Convert an ASCII encoded string to use UTF-8 encoding.
+// o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned string.
+// o_bufinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned buffer.
+// max_chars: The maximum number of characters that can be stored in the buffer, not including the terminating nul.
+// This parameter can be used to allocate a buffer larger than an existing buffer that is initialized with the contents of the existing buffer.
+// Specify zero for max_chars to allocate a buffer the same size as the supplied initial string strbuf.
+// strbuf   : Pointer to the start of the first codepoint of the nul-terminated, ASCII encoded string to convert.
+// Returns a pointer to the buffer containing the nul-terminated, UTF-8 encoded string. Free the returned buffer using the PIL_Utf8StringDelete function.
+// The function returns null if the conversion fails.
+PIL_API(char*)
+PIL_Utf8StringCreateFromAscii
+(
+    struct PIL_STRING_INFO *o_strinfo,
+    struct PIL_STRING_INFO *o_bufinfo,
+    size_t                  max_chars,
+    char const                *strbuf
+);
+
+// Convert a UTF-16 encoded string to use UTF-8 encoding.
+// o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned string.
+// o_bufinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned buffer.
+// max_chars: The maximum number of characters that can be stored in the buffer, not including the terminating nul.
+// This parameter can be used to allocate a buffer larger than an existing buffer that is initialized with the contents of the existing buffer.
+// Specify zero for max_chars to allocate a buffer the same size as the supplied initial string strbuf.
+// strbuf   : Pointer to the start of the first codepoint of the nul-terminated, UTF-16 encoded string to convert.
+// Returns a pointer to the buffer containing the nul-terminated, UTF-8 encoded string. Free the returned buffer using the PIL_Utf8StringDelete function.
+// The function returns null if the conversion fails.
+PIL_API(char*)
+PIL_Utf8StringCreateFromUtf16
+(
+    struct PIL_STRING_INFO *o_strinfo,
+    struct PIL_STRING_INFO *o_bufinfo,
+    size_t                  max_chars,
+    char16_t const            *strbuf
+);
+
+// Convert a UTF-32 encoded string to use UTF-8 encoding.
+// o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned string.
+// o_bufinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned buffer.
+// max_chars: The maximum number of characters that can be stored in the buffer, not including the terminating nul.
+// This parameter can be used to allocate a buffer larger than an existing buffer that is initialized with the contents of the existing buffer.
+// Specify zero for max_chars to allocate a buffer the same size as the supplied initial string strbuf.
+// strbuf   : Pointer to the start of the first codepoint of the nul-terminated, UTF-32 encoded string to convert.
+// Returns a pointer to the buffer containing the nul-terminated, UTF-8 encoded string. Free the returned buffer using the PIL_Utf8StringDelete function.
+// The function returns null if the conversion fails.
+PIL_API(char*)
+PIL_Utf8StringCreateFromUtf32
+(
+    struct PIL_STRING_INFO *o_strinfo,
+    struct PIL_STRING_INFO *o_bufinfo,
+    size_t                  max_chars,
+    char32_t const            *strbuf
+);
+
+// Convert a UTF-8 encoded string to a UTF-16 encoding.
+// o_u16info: Pointer to an optional PIL_STRING_INFO which if supplied, will be updated with information about the UTF-16 string.
+// strinfo  : Pointer to an optional PIL_STRING_INFO which if supplied, contains information about the string stored in strbuf.
+// strbuf   : Pointer to the start of the first codepoint to convert. This buffer must be nul-terminated.
+// Returns a pointer to the buffer containing the nul-terminated, UTF-16 encoded string. Free the returned buffer using the PIL_Utf16StringDelete function.
+// The function returns null if the conversion fails.
+PIL_API(char16_t*)
+PIL_Utf8StringConvertToUtf16
+(
+    struct PIL_STRING_INFO *o_u16info,
+    struct PIL_STRING_INFO   *strinfo,
+    char const                *strbuf
+);
+
+// Convert a UTF-8 encoded string to a UTF-32 encoding.
+// o_u32info: Pointer to an optional PIL_STRING_INFO which if supplied, will be updated with information about the UTF-32 string.
+// strinfo  : Pointer to an optional PIL_STRING_INFO which if supplied, contains information about the string stored in strbuf.
+// strbuf   : Pointer to the start of the first codepoint to convert. This buffer must be nul-terminated.
+// Returns a pointer to the buffer containing the nul-terminated, UTF-32 encoded string. Free the returned buffer using the PIL_Utf32StringDelete function.
+// The function returns null if the conversion fails.
+PIL_API(char32_t*)
+PIL_Utf8StringConvertToUtf32
+(
+    struct PIL_STRING_INFO *o_u32info,
+    struct PIL_STRING_INFO   *strinfo,
+    char const                *strbuf
+);
+
+// Free a string buffer allocated by PIL_Utf8StringCreate or any of the PIL_Utf8StringCreateFrom* functions.
+// strbuf: A pointer to a string buffer returned by PIL_Utf8StringCreate or any of the PIL_Utf8StringCreateFrom* functions.
+PIL_API(void)
+PIL_Utf8StringDelete
+(
+    char *strbuf
+);
+
+// Free a string buffer allocated by PIL_Utf8StringConvertToUtf16.
+// strbuf: A pointer to a string buffer returned by PIL_Utf8StringConvertToUtf16.
+PIL_API(void)
+PIL_Utf16StringDelete
+(
+    char16_t *strbuf
+);
+
+// Free a string buffer allocated by PIL_Utf8StringConvertToUtf32.
+// strbuf: A pointer to a string buffer returned by PIL_Utf8StringConvertToUtf32.
+PIL_API(void)
+PIL_Utf32StringDelete
+(
+    char32_t *strbuf
+);
+
+// Determine the number of bytes in a UTF-8 encoded string given pointers to the start of the first codepoint and one-past the last codepoint.
+// beg: A pointer to the start of the first codepoint in the string.
+// end: A pointer to one-past the end of the final codepoint in the string.
+// Returns the number of bytes in the string.
+PIL_API(size_t)
+PIL_Utf8StringByteCount
+(
+    char const *beg,
+    char const *end
+);
+
+// Search a UTF-8 encoded string buffer for the next nul character.
+// start: A pointer to the first codepoint to examine.
+// Returns a pointer to the next nul occurring at or subsequent to start.
+PIL_API(char*)
+PIL_Utf8StringFindNul
+(
+    char const *start
+);
+
+// Retrieve information about a UTF-8 encoded string.
+// o_strinfo: Pointer to the structure to be updated with information about the string stored in strbuf.
+// strbuf   : Pointer to the start of a codepoint of a UTF-8 encoded, nul-terminated string.
+PIL_API(void)
+PIL_Utf8StringInfo
+(
+    struct PIL_STRING_INFO *o_strinfo,
+    char const                *strbuf
+);
+
+// Compare two UTF-8 encoded, nul-terminated strings.
+// a: A pointer to the start of the first codepoint of a nul-terminated, UTF-8 encoded string.
+// b: A pointer to the start of the first codepoint of a nul-terminated, UTF-8 encoded string.
+// Returns zero if the strings compare as identical, a negative value if a appears lexographically before b, or a positive value if b appears lexographically before a.
+PIL_API(int32_t)
+PIL_Utf8StringCompare
+(
+    char const *a,
+    char const *b
+);
+
+// Compare two UTF-8 encoded, nul-terminated strings, ignoring case differences.
+// a: A pointer to the start of the first codepoint of a nul-terminated, UTF-8 encoded string.
+// b: A pointer to the start of the first codepoint of a nul-terminated, UTF-8 encoded string.
+// Returns zero if the strings compare as identical, a negative value if a appears lexographically before b, or a positive value if b appears lexographically before a.
+PIL_API(int32_t)
+PIL_Utf8StringCompareNoCase
+(
+    char const *a,
+    char const *b
+);
+
+// Given a pointer to the start of a UTF-8 codepoint, return a pointer to the start of the next codepoint.
+// o_codepoint: On return, this location is updated with the value stored in the codepoint at bufitr.
+// o_bytecount: On return, this location is updated with the number of bytes required to represent the codepoint stored at bufitr.
+// bufitr     : A pointer to the start of a UTF-8 codepoint.
+// Returns a pointer to the start of the next UTF-8 codepoint, or null if bufitr is null or points to an invalid codepoint.
+PIL_API(char*)
+PIL_Utf8StringNextCodepoint
+(
+    char32_t *o_codepoint,
+    uint32_t *o_bytecount,
+    char const    *bufitr
+);
+
+// Given a pointer to the start of a UTF-8 codepoint, return a pointer to the start of the codepoint immediately preceeding it.
+// o_codepoint: On return, this location is updated with the value stored in the codepoint immediately preceeding bufitr.
+// o_bytecount: On return, this location is updated with the number of bytes required to represent the codepoint immediately preceeding bufitr.
+// bufitr     : A pointer to the start of a UTF-8 codepoint.
+// Returns a pointer to the start of the UTF-8 codepoint immediately preceeding bufitr, or null if bufitr is null or an invalid codepoint was encountered.
+PIL_API(char*)
+PIL_Utf8StringPrevCodepoint
+(
+    char32_t *o_codepoint,
+    uint32_t *o_bytecount,
+    char const    *bufitr
+);
+
+// Copy a single UTF-8 codepoint from one buffer to another.
+// o_bytecount: On return, this location is updated with the number of bytes in the codepoint pointed to by src.
+// o_wordcount: On return, this location is updated with the number of char8_t's that were/would be written to the dst buffer.
+// dst        : The location to which the codepoint will be written.
+// src        : A pointer to the start of the UTF-8 codepoint to copy.
+// Returns a pointer to the start of the next codepoint in the src buffer, or NULL if src pointed to an invalid codepoint.
+PIL_API(char*)
+PIL_Utf8StringCopyCodepoint
+(
+    uint32_t         *o_bytecount,
+    uint32_t         *o_wordcount,
+    char       * PIL_RESTRICT dst,
+    char const * PIL_RESTRICT src
+);
+
+// Append one UTF-8 encoded string to another.
+// o_dstinfo: Pointer to an optional STRING_INFO_UTF8 to update with the attributes of the string after the append operation is performed.
+// dstinfo  : Pointer to an optional STRING_INFO_UTF8 containing information about the string stored in dstbuf.
+// srcinfo  : Pointer to an optional STRING_INFO_UTF8 containing information about the string stored in srcbuf.
+// max_dst_bytes: The size of the buffer starting at address dstbuf, in bytes.
+// dstbuf   : Pointer to the start of the string stored in the destination buffer.
+// srcbuf   :  Pointer to the start of the nul-terminated, UTF-8 encoded string to append to the destination buffer.
+// Returns zero if the append operation is successful, or non-zero if an error occurred.
+PIL_API(int32_t)
+PIL_Utf8StringAppend
+(
+    struct PIL_STRING_INFO *o_dstinfo,
+    struct PIL_STRING_INFO   *dstinfo,
+    struct PIL_STRING_INFO   *srcinfo,
+    size_t              max_dst_bytes,
+    char       * PIL_RESTRICT  dstbuf,
+    char const * PIL_RESTRICT  srcbuf
+);
+
+// Calculate the number of bytes required to store the binary data converted from a base64-encoded string.
+// All base64-encoded data is assumed to appear on a single line.
+// b64size: The number of bytes of base64-encoded data, including any padding bytes.
+// Returns the number of bytes required to store the decoded data.
+PIL_API(size_t)
+PIL_BinarySizeForBase64
+(
+    size_t b64size
+);
+
+// Calculate the number of bytes required to store the binary data converted from a base64-encoded, nul-terminated string.
+// encbuf: Pointer to a nul-terminated buffer containing the base64-encoded data.
+// Returns the number of bytes required to store the decocded data.
+PIL_API(size_t)
+PIL_BinarySizeForBase64Data
+(
+    char const *encbuf
+);
+
+// Calculate the maximum number of bytes required to base64-encode binary data of a given size.
+// All base64-encoded data is assumed to appear on a single line.
+// o_padsize: On return, this location is updated with the number of padding bytes to be added during encoding.
+// binsize  : The size of the binary data, in bytes.
+// Returns the maximum number of bytes required to base64-encode a data block of the given size.
+PIL_API(size_t)
+PIL_Base64SizeForBinary
+(
+    size_t *o_padsize,
+    size_t    binsize
+);
+
+// Base64-encode a block of data.
+// o_numdst: On return, this location is updated with the number of bytes written to the destination buffer.
+// If dst is null and max_dst is zero, the call returns zero and this location is updated with the number of bytes required to base64-encode the input data.
+// dst     : Pointer to the buffer to which the base64-encoded data will be written.
+// max_dst : The maximum number of bytes that can be written to the destination buffer.
+// src     : Pointer to the buffer containing the source data.
+// num_src : The number of bytes of data to read from the source buffer.
+// Returns zero if the data is successfully encoded, or non-zero if an error occurred.
+PIL_API(int32_t)
+PIL_Base64Encode
+(
+    size_t     * PIL_RESTRICT o_numdst,
+    void       * PIL_RESTRICT      dst,
+    size_t                     max_dst,
+    void const * PIL_RESTRICT      src,
+    size_t                     num_src
+);
+
+// Decode a base64-encoded block of data.
+// o_numdst: On return, this location is updated with the number of bytes written to the destination buffer.
+// If dst is null and max_dst is zero, the call returns zero and this location is updated with the number of bytes required to store the decoded data.
+// dst     : Pointer to the buffer to which the decoded data will be written.
+// max_dst : The maximum number of bytes that can be written to the destination buffer.
+// src     : Pointer to the buffer containing the base64-encoded data.
+// num_src : The number of bytes of data to read from the source buffer. Specify zero if the source buffer is nul-terminated and the size should be computed.
+// Returns Zero if the data is successfully decoded, or non-zero if an error occurs.
+PIL_API(int32_t)
+PIL_Base64Decode
+(
+    size_t     * PIL_RESTRICT o_numdst,
+    void       * PIL_RESTRICT      dst,
+    size_t                     max_dst,
+    void const * PIL_RESTRICT      src,
+    size_t                     num_src
 );
 
 // Perform an internal self-consistency check on a PIL_TABLE_INDEX structure.
@@ -1332,7 +1692,7 @@ PIL_GpuDriverOpen
 //   This is going to be quite a lot of work to get done.
 
 #ifdef __cplusplus
-}; /* extern "C" */
+}; // extern "C"///
 #endif
 
 // Pull in the appropriate platform-specific header to pick up definitions for platform-specific types.
