@@ -696,22 +696,13 @@ struct  PIL_TABLE_INIT;                                                        /
 struct  PIL_TABLE_DATA;                                                        // Defined in platform.h.
 struct  PIL_TABLE_DESC;                                                        // Defined in platform.h.
 struct  PIL_TABLE_DATA_STREAM_DESC;                                            // Defined in platform.h.
-struct  PIL_GPU_DRIVER;                                                        // Defined in platform.h.
-struct  PIL_GPU_DRIVER_INIT;                                                   // Defined in platform.h.
-struct  PIL_GPU_DRIVER_INFO;                                                   // Defined in platform.h.
-struct  PIL_GPU_DRIVER_STATE;                                                  // Opaque type with no definition.
-struct  PIL_GPU_DEVICE;                                                        // Defined in platform.h.
+struct  PIL_GPU_DEVICE_INFO;                                                   // Defined in platform.h.
 struct  PIL_GPU_DEVICE_INIT;                                                   // Defined in platform.h.
-struct  PIL_GPU_DEVICE_STATE;                                                  // Opaque type with no definition.
+struct  PIL_GPU_DEVICE_HANDLE;                                                 // Defined in platform.h.
 
 typedef uint32_t PIL_HANDLE_BITS;                                              // Handles are opaque 32-bit integer values.
 
-typedef int  (*PIL_PFN_Unknown         )(void);                                // Signature for a dynamically-resolved function. The calling code will have to cast the function pointer to its specific type.
-typedef int  (*PIL_PFN_GPU_DriverInit  )(struct PIL_GPU_DRIVER_INIT*, void**); // Signature for a function that initializes a GPU driver.
-typedef void (*PIL_PFN_GPU_DriverShut  )(struct PIL_GPU_DRIVER_STATE*);        // Signature for a function that shuts down a GPU driver.
-typedef int  (*PIL_PFN_GPU_DriverQuery )(struct PIL_GPU_DRIVER_STATE*, struct PIL_GPU_DRIVER_INFO*);         // Signature for a function that retrieves information about available GPUs.
-typedef int  (*PIL_PFN_GPU_DeviceCreate)(struct PIL_GPU_DRIVER_STATE*, struct PIL_GPU_DEVICE_INIT*, void**); // Signature for a function that creates a logical GPU device interface.
-typedef void (*PIL_PFN_GPU_DeviceDelete)(struct PIL_GPU_DRIVER_STATE*, struct PIL_GPU_DEVICE_STATE*);        // Signature for a function that destroys a logical GPU device interface.
+typedef int  (*PIL_PFN_Unknown       )(void);                                  // Signature for a dynamically-resolved function. The calling code will have to cast the function pointer to its specific type.
 
 typedef enum   PIL_MEMORY_ALLOCATOR_TYPE {                                     // Define the allowed values for memory allocator types. An allocator can manage either host or device memory. Device memory may or may not be visible to the host CPU.
     PIL_MEMORY_ALLOCATOR_TYPE_INVALID                 =  0UL,                  // This value is invalid and should not be used.
@@ -732,9 +723,20 @@ typedef enum   PIL_GPU_DRIVER_TYPE {                                           /
     PIL_GPU_DRIVER_TYPE_VULKAN1                       =  2UL,                  // Use Vulkan 1.x to interface to the GPUs on the host.
 } PIL_GPU_DRIVER_TYPE;
 
+typedef enum   PIL_GPU_DEVICE_TYPE {                                           // Define the recognized types of GPU devices.
+    PIL_GPU_DEVICE_TYPE_UNKNOWN                       =  0UL,                  // The device type is not known or not reported by the device interface.
+    PIL_GPU_DEVICE_TYPE_VIRTUAL                       =  1UL,                  // The device is virtualized.
+    PIL_GPU_DEVICE_TYPE_DISCRETE                      =  1UL,                  // The device is a separate processor connected to the host.
+    PIL_GPU_DEVICE_TYPE_INTEGRATED                    =  2UL,                  // The device is tightly integrated with the host CPU.
+} PIL_GPU_DEVICE_TYPE;
+
 typedef enum   PIL_GPU_DEVICE_ORDINAL {                                        // Define special values that can be supplied for PIL_GPU_DEVICE_INIT::DeviceOrdinal.
-    PIL_GPU_DEVICE_ORDINAL_ANY                        =  -1L,                  // Select the first physical GPU device meeting the application requirements.
+    PIL_GPU_DEVICE_ORDINAL_ANY                        = -1LL,                  // Select the first physical GPU device meeting the application requirements.
 } PIL_GPU_DEVICE_ORDINAL;
+
+typedef enum   PIL_GPU_DEVICE_MEMORY_SIZE {                                    // Define special values that can be reported for PIL_GPU_DEVICE_INFO::MemorySize
+    PIL_GPU_DEVICE_MEMORY_SIZE_UNKNOWN                =  0ULL,                 // The device memory size is not known or not reported by the device interface.
+} PIL_GPU_DEVICE_MEMORY_SIZE;
 
 typedef enum   PIL_MEMORY_ARENA_FLAGS {                                        // Flags that can be bitwise OR'd to control the behavior of an arena memory allocator.
     PIL_MEMORY_ARENA_FLAGS_NONE                       = (0UL <<  0),           // No flags are specified. Specifying no flags will cause arena creation to fail.
@@ -761,22 +763,16 @@ typedef enum   PIL_DEVICE_MEMORY_ALLOCATION_FLAGS {                            /
     PIL_DEVICE_MEMORY_ALLOCATION_FLAG_WRITE_COMBINED = (1UL <<  3),            // The memory should be write-combined.
 } PIL_DEVICE_MEMORY_ALLOCATION_FLAGS;
 
-typedef enum   PIL_GPU_DRIVER_FEATUE_FLAGS {                                   // Flags that can be bitwise OR'd to define GPU driver selection requirements or capabilities.
-    PIL_GPU_DRIVER_FEATURE_FLAGS_NONE                = (0UL <<  0),            // The driver is not supported on the host system.
-    PIL_GPU_DRIVER_FEATURE_FLAG_DEBUG                = (1UL <<  0),            // The driver supports debugging features at some cost in performance.
-    PIL_GPU_DRIVER_FEATURE_FLAG_COMPUTE              = (1UL <<  1),            // The driver supports creating GPU compute engine interfaces.
-    PIL_GPU_DRIVER_FEATURE_FLAG_DISPLAY              = (1UL <<  2),            // The driver supports creating GPU display engine interfaces.
-    PIL_GPU_DRIVER_FEATURE_FLAG_PRESENT              = (1UL <<  3),            // The driver supports creating GPU presentation engine interfaces.
-} PIL_GPU_DRIVER_FEATURE_FLAGS;
-
 typedef enum   PIL_GPU_DEVICE_FEATURE_FLAGS {                                  // Flags that can be bitwise OR'd to define GPU device selection requirements or capabilities.
     PIL_GPU_DEVICE_FEATURE_FLAGS_NONE                = (0UL <<  0),            // No flags are specified. Device creation will always fail.
-    PIL_GPU_DEVICE_FEATURE_FLAG_COMPUTE              = (1UL <<  0),            // Device selection will consider only GPUs that support compute capability.
-    PIL_GPU_DEVICE_FEATURE_FLAG_DISPLAY              = (1UL <<  1),            // Device selection will consider only GPUs that support display capability.
-    PIL_GPU_DEVICE_FEATURE_FLAG_PRESENT              = (1UL <<  2),            // Device selection will consider only GPUs that support presentation capability.
-    PIL_GPU_DEVICE_FEATURE_FLAG_DISCRETE             = (1UL <<  3),            // Device selection will consider discrete GPUs.
-    PIL_GPU_DEVICE_FEATURE_FLAG_INTEGRATED           = (1UL <<  4),            // Device selection will consider integrated GPUs.
-    PIL_GPU_DEVICE_FEATURE_FLAG_EXCLUSIVE            = (1UL <<  5),            // Device creation should fail if the selected GPU already has an active logical device.
+    PIL_GPU_DEVICE_FEATURE_FLAG_DEBUG                = (1UL <<  0),            // Device interface debugging features should be enabled.
+    PIL_GPU_DEVICE_FEATURE_FLAG_COMPUTE              = (1UL <<  1),            // Device selection will consider only GPUs that support compute capability.
+    PIL_GPU_DEVICE_FEATURE_FLAG_DISPLAY              = (1UL <<  2),            // Device selection will consider only GPUs that support display capability.
+    PIL_GPU_DEVICE_FEATURE_FLAG_PRESENT              = (1UL <<  3),            // Device selection will consider only GPUs that support presentation capability.
+    PIL_GPU_DEVICE_FEATURE_FLAG_DISCRETE             = (1UL <<  4),            // Device selection will consider discrete GPUs.
+    PIL_GPU_DEVICE_FEATURE_FLAG_INTEGRATED           = (1UL <<  5),            // Device selection will consider integrated GPUs.
+    PIL_GPU_DEVICE_FEATURE_FLAG_VIRTUALIZED          = (1UL <<  6),            // Device selection will consider virtualized GPUs.
+    PIL_GPU_DEVICE_FEATURE_FLAG_EXCLUSIVE            = (1UL <<  7),            // Device creation should fail if the selected GPU already has an active logical device.
 } PIL_GPU_DEVICE_FEATURE_FLAGS;
 
 typedef union  PIL_ADDRESS_OR_OFFSET {                                         // A union representing either an offset from some base location, or a valid address in the host process address space.
@@ -866,39 +862,17 @@ typedef struct PIL_TABLE_INIT {                                                /
     uint32_t                         TableType;                                // One of the values of the PIL_TABLE_TYPE enumeration.
 } PIL_TABLE_INIT;
 
-typedef struct PIL_GPU_DRIVER {                                                // The dispatch table used to interface with a GPU driver.
-    struct PIL_GPU_DRIVER_STATE         *State;                                // Internal state allocated by the GPU driver.
-    PIL_PFN_GPU_DriverInit        DriverInitFn;                                // The function used to create and initialize a GPU driver interface.
-    PIL_PFN_GPU_DriverShut        DriverShutFn;                                // The function used to shutdown and free resources allocated by a GPU driver interface.
-    PIL_PFN_GPU_DriverQuery      DriverQueryFn;                                // The function used to query for supported GPUs and capabilities on the host system.
-    PIL_PFN_GPU_DeviceCreate    DeviceCreateFn;                                // The function used to create and initialize a logical GPU device.
-    PIL_PFN_GPU_DeviceDelete    DeviceDeleteFn;                                // The function used to free resources and shutdown a logical GPU device.
-} PIL_GPU_DRIVER;
+typedef struct PIL_GPU_DEVICE_HANDLE {                                         // Identifies a logical GPU device.
+    PIL_HANDLE_BITS                       Bits;                                // The packed handle bits.
+} PIL_GPU_DEVICE_HANDLE;
 
-typedef struct PIL_GPU_DRIVER_INIT {                                           // Data used to configure the creation of a GPU driver interface.
-    uint32_t                  RequiredFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DRIVER_FEATURE_FLAGS enumeration specifying features required by the application.
-    uint32_t                    MaxDeviceCount;                                // The maximum number of logical GPU devices that will be created by the application.
-} PIL_GPU_DRIVER_INIT;
-
-typedef struct PIL_GPU_DRIVER_INFO {                                           // Data providing basic information about a GPU driver and its capabilities.
-    uint32_t                     DriverVersion;                                // The packed version of the GPU driver, created with PIL_MakeVersion. Use the PIL_Version_GetYYYYY macros to extract individual components.
-    uint32_t                       DeviceCount;                                // The number of physical GPUs supporting the GPU driver interface installed in the host system.
-    uint32_t                 SupportedFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DRIVER_FEATURE_FLAGS enumeration specifying features available to the application.
-    char                       DriverName[128];                                // A nul-terminated ASCII string, suitable for display, describing the driver.
-} PIL_GPU_DRIVER_INFO;
-
-typedef struct PIL_GPU_DEVICE {                                                // The dispatch table used to interface with a GPU device.
-    struct PIL_GPU_DEVICE_STATE   *DeviceState;                                // Internal state allocated by the logical GPU device.
-    struct PIL_GPU_DRIVER_STATE   *DriverState;                                // Internal state allocated by the GPU driver.
-    uint32_t                     DeviceOrdinal;                                // The zero-based index of the physical device bound to the logical GPU device interface.
-    uint32_t                 SupportedFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DEVICE_FEATURE_FLAGS enumeration specifying the features supported by the device.
-    // ... resource creation
-} PIL_GPU_DEVICE;
-
-typedef struct PIL_GPU_DEVICE_INIT {                                           // Data used to configure the creation of a logical GPU device.
-    uint32_t                  RequiredFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DEVICE_FEATURE_FLAGS enumeration specifying the features required by the application.
-    int32_t                      DeviceOrdinal;                                // The zero-based index of the physical device to use, or PIL_GPU_DEVICE_ORDINAL_ANY to select any device meeting the feature requirements.
-} PIL_GPU_DEVICE_INIT;
+typedef struct PIL_GPU_DEVICE_INFO {                                           // Data providing basic information about a GPU device interface.
+    uint64_t                     DeviceOrdinal;                                // An opaque value uniquely identifying the device.
+    uint64_t                      DeviceMemory;                                // An estimate of the total memory available to the device, in bytes, or PIL_GPU_DEVICE_MEMORY_SIZE_UNKNOWN if no estimate is available.
+    uint32_t                  PerformanceLevel;                                // An integer value representing the estimated performance level of the device, with larger values equating to higher performance.
+    uint32_t                 SupportedFeatures;                                // One or more bitwise OR'd values of the PIL_GPU_DEVICE_FEATURE_FLAGS enumeration indicating features supported by the device.
+    PIL_GPU_DEVICE_TYPE             DeviceType;                                // One or the values of the PIL_GPU_DEVICE_TYPE enumeration indicating the type of device.
+} PIL_GPU_DEVICE_INFO;
 
 #ifdef __cplusplus
 extern "C" {
@@ -1323,30 +1297,39 @@ PIL_TableInsertId
     PIL_HANDLE_BITS         item
 );
 
-// Open a connection to a GPU interface on the host and retrieve information about available GPUs.
-// driver: The PIL_GPU_DRIVER structure to populate.
-// config: Information about the application and its GPU requirements.
-// driver_info: Pointer to a PIL_GPU_DRIVER_INFO structure to populate with information about the physical GPUs available on the host.
+// Open a connection to a GPU interface on the host and retrieve information about available GPUs and supported features.
 // driver_type: One of the values of the PIL_GPU_DRIVER_TYPE enumeration indicating the type of driver to use for GPU access.
+// o_driver_info: Pointer to a PIL_GPU_DRIVER_INFO structure to populate with information about the physical GPUs available on the host.
 // Returns zero if the driver interface is available on the host, or non-zero if an error occurred.
 PIL_API(int32_t)
 PIL_GpuDriverOpen
 (
-    struct PIL_GPU_DRIVER           *driver, 
-    struct PIL_GPU_DRIVER_INIT      *config, 
-    struct PIL_GPU_DRIVER_INFO *driver_info, 
-    PIL_GPU_DRIVER_TYPE         driver_type
+    PIL_GPU_DRIVER_TYPE driver_type
 );
 
-// Close a connection to a GPU interface on the host.
-// Any logical devices should be deleted prior to closing the driver.
-// Any resources allocated by the driver are freed when the driver is closed.
-// driver: The PIL_GPU_DRIVER representing the driver interface to close.
-PIL_API(void)
-PIL_GpuDriverClose
-(
-    struct PIL_GPU_DRIVER *driver
-);
+// The user is going to first check that a GPU API is supported:
+// if (PIL_GpuDriverOpen(PIL_GPU_DRIVER_TYPE_VULKAN1) != 0) {
+//   // The interface is not available...
+// }
+// This mainly updates some global data, which has to be synchronized (platform-specific).
+// The entire GPU interface (types, function pointers, etc.) can then be private.
+// Then the user is going to want to create a logical GPU device interface, but first they'll have to get information about available devices.
+//   PIL did this well - see DescribeDisplayAdapters.
+//   It takes a pointer to an array of PIL_GPU_DEVICE_DESC records to populate, a start index and the max results to return, plus the GPU_DRIVER_TYPE to query.
+//   A PIL_GPU_DEVICE_DESC provides a device ordinal, uniquely identifying the device.
+//   A PIL_GPU_DEVICE_DESC provides an overall "performance level" indicator for the device.
+//   A PIL_GPU_DEVICE_DESC indicates whether the device is discrete or integrated, if known.
+//   A PIL_GPU_DEVICE_DESC indicates the amount of memory available to the device, if known.
+// Once the user has selected a physical device (each of which has a unique identifier) they can create a logical GPU device interface by supplying the GPU_DRIVER_TYPE and device ordinal.
+
+// Then there's the matter of displays and windows and swapchains, and user input since that's tied to the windowing system.
+//   We'll ignore user input for the time being.
+//   PIL has a good display interface. The user gets back a handle.
+//   The way PIL does it, all windows are tied to a logical GPU device.
+//   Let's try and implement this for Wayland, then for X Windows.
+//   Most everything you need to see is in:
+//   https://github.com/SaschaWillems/Vulkan/blob/master/base/vulkanexamplebase.cpp
+//   This is going to be quite a lot of work to get done.
 
 #ifdef __cplusplus
 }; /* extern "C" */
