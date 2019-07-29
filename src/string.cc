@@ -980,8 +980,10 @@ PIL_Utf8StringAppend
         } errno = ENOBUFS;
         return -1;
     }
-    nul = &dinfo.BufferEnd[-1];
-    memcpy(nul, srcbuf, sinfo.LengthBytes);
+    if (srcbuf != nullptr) {
+        nul = &dinfo.BufferEnd[-1];
+        memcpy(nul, srcbuf, sinfo.LengthBytes);
+    }
     if (o_dstinfo) {
         o_dstinfo->BufferEnd    =((char*) dinfo.Buffer) + (dinfo.LengthBytes-PIL_UTF8_NUL_BYTES) + sinfo.LengthBytes;
         o_dstinfo->LengthBytes += sinfo.LengthBytes - PIL_UTF8_NUL_BYTES;
@@ -1059,6 +1061,13 @@ PIL_Base64Encode
         if (o_numdst) {
            *o_numdst = req_bytes;
         } return 0;
+    }
+    if (dst == nullptr || out == nullptr) {
+        if (o_numdst) {
+           *o_numdst = 0;
+        }
+        errno = ENOBUFS;
+        return -1;
     }
     if (req_bytes > max_dst) {
         if (o_numdst) {

@@ -36,8 +36,6 @@
 #####################
 build-Debug
 build-Release
-projects/*/
-bin
 
 # OS generated files #
 ######################
@@ -51,3 +49,5 @@ Icon?
 ehthumbs.db
 Thumbs.db
 npm-debug.log
+*.user
+

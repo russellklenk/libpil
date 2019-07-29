@@ -340,8 +340,8 @@ PIL_TableCreate
 
     // Reserve process address space for the data streams.
     for (i = 0,  n = stream_count; i < n; ++i) {
-        stream_reserve = init->TableCapacity * streams[i].Size;
-        stream_commit  = init->InitialCommit * streams[i].Size;
+        stream_reserve = init->TableCapacity * (size_t) streams[i].Size;
+        stream_commit  = init->InitialCommit * (size_t) streams[i].Size;
         if ((stream_ptr= PIL_HostMemoryReserveAndCommit(&stream_block, stream_reserve, stream_commit, PIL_HOST_MEMORY_ALLOCATION_FLAGS_READWRITE)) == nullptr) {
             goto cleanup_and_fail;
         }
@@ -359,8 +359,8 @@ PIL_TableCreate
 
 cleanup_and_fail:
     for (i = 0,  n = stream_count; i < n; ++i) {
-        stream_block.BytesCommitted  = init->InitialCommit * streams[i].Size;
-        stream_block.BytesReserved   = init->TableCapacity * streams[i].Size;
+        stream_block.BytesCommitted  = init->InitialCommit * (size_t) streams[i].Size;
+        stream_block.BytesReserved   = init->TableCapacity * (size_t) streams[i].Size;
         stream_block.BlockOffset     = 0;
         stream_block.HostAddress     =(uint8_t*) streams[i].Data->StorageBuffer;
         stream_block.AllocationFlags = PIL_HOST_MEMORY_ALLOCATION_FLAGS_READWRITE;
@@ -425,9 +425,9 @@ PIL_TableEnsure
         return 0;
     }
     for (i = 0, n = PIL_Table_GetStreamCount(table); i < n; ++i) {
-        stream_commit                = new_item_count * streams[i]->ElementSize;
-        stream_block.BytesCommitted  = old_item_count * streams[i]->ElementSize;
-        stream_block.BytesReserved   = max_item_count * streams[i]->ElementSize;
+        stream_commit                = new_item_count * (size_t) streams[i]->ElementSize;
+        stream_block.BytesCommitted  = old_item_count * (size_t) streams[i]->ElementSize;
+        stream_block.BytesReserved   = max_item_count * (size_t) streams[i]->ElementSize;
         stream_block.BlockOffset     = 0;
         stream_block.HostAddress     = PIL_Table_GetStreamBegin(uint8_t, table, i);
         stream_block.AllocationFlags = PIL_HOST_MEMORY_ALLOCATION_FLAGS_READWRITE;
@@ -460,8 +460,8 @@ PIL_TableDelete
             max_item_count = PIL_TableIndex_GetCapacity(index);
         }
         for (i = 0, n = PIL_Table_GetStreamCount(table); i < n; ++i) {
-            stream_block.BytesCommitted  = cur_item_count  * streams[i]->ElementSize;
-            stream_block.BytesReserved   = max_item_count  * streams[i]->ElementSize;
+            stream_block.BytesCommitted  = cur_item_count  * (size_t) streams[i]->ElementSize;
+            stream_block.BytesReserved   = max_item_count  * (size_t) streams[i]->ElementSize;
             stream_block.BlockOffset     = 0;
             stream_block.HostAddress     = PIL_Table_GetStreamBegin(uint8_t, table, i);
             stream_block.AllocationFlags = PIL_HOST_MEMORY_ALLOCATION_FLAGS_READWRITE;

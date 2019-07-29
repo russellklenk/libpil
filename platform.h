@@ -609,7 +609,7 @@
 // Returns a pointer (_type*) to the given element.
 #ifndef PIL_TableData_GetElementPointer
 #define PIL_TableData_GetElementPointer(_type, _d, _i)                         \
-    (_type*)(((uint8_t*)(_d)->StorageBuffer) +((_i) * (_d)->ElementSize))
+    (_type*)(((uint8_t*)(_d)->StorageBuffer) +((ptrdiff_t)(_i) * (size_t)(_d)->ElementSize))
 #endif
 
 // Retrieve the PIL_TABLE_TYPE for a table.

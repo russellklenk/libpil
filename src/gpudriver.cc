@@ -4,7 +4,7 @@
 #include <string.h>
 #include "platform.h"
 
-#include "gpudrvvk.h"
+//#include "gpudrvvk.h"
 
 
 PIL_API(int32_t)
