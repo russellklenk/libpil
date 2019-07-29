@@ -1624,7 +1624,7 @@ PIL_LinuxPathBufferCreate
 // o_strinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned string.
 // o_bufinfo: Pointer to an optional PIL_STRING_INFO that if supplied will be initialized with the attributes of the returned buffer.
 // strinfo  : Pointer to an optional PIL_STRING_INFO that if supplied contains information about the string pointed to by strbuf.
-// strbuf   : Pointer to an optional UTF-16 encoded, nul-terminated string that will be used as the initial contents of the new buffer.
+// strbuf   : Pointer to an optional UTF-8 encoded, nul-terminated string that will be used as the initial contents of the new buffer.
 // Returns A pointer to the start of the allocated buffer, or NULL if memory allocation failed.
 PIL_API(char*)
 PIL_Win32PathBufferCreate

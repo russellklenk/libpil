@@ -458,7 +458,6 @@ scan_for_end_of_root:
     return Win32PathExtractPathParts(o_parts, &sinfo);
 }
 
-#if 0
 PIL_API(char*)
 PIL_LinuxPathBufferAppend
 (
@@ -467,7 +466,83 @@ PIL_LinuxPathBufferAppend
     struct PIL_STRING_INFO   *appinfo, 
     char                      *dstbuf, 
     char const                *appstr
-);
+)
+{
+    PIL_STRING_INFO dsinfo;
+    PIL_STRING_INFO ssinfo;
+    
+    memset(&dsinfo, 0, sizeof(PIL_STRING_INFO));
+    memset(&ssinfo, 0, sizeof(PIL_STRING_INFO));
+
+    if (appstr != nullptr) {
+        if (appinfo != nullptr) {
+            memcpy(&ssinfo, appinfo, sizeof(PIL_STRING_INFO));
+        } else {
+            PIL_Utf8StringInfo(&ssinfo, appstr);
+        }
+    }
+    if (dstbuf != nullptr) {
+        if (dstinfo != nullptr) {
+            memcpy(&dsinfo, dstinfo, sizeof(PIL_STRING_INFO));
+        } else {
+            PIL_Utf8StringInfo(&dsinfo, dstbuf);
+        }
+    }
+    
+    if (ssinfo.LengthChars == 0) { // Nothing to append.
+        if (o_dstinfo) {
+            memcpy(o_dstinfo, &dsinfo, sizeof(PIL_STRING_INFO));
+        } return dstbuf;
+    }
+    if (dsinfo.LengthChars + ssinfo.LengthChars > PIL_WIN32_PATH_STRING_MAX_CHARS) {
+        if (o_dstinfo) {
+            memcpy(o_dstinfo, &dsinfo, sizeof(PIL_STRING_INFO));
+        } errno = ENAMETOOLONG;
+        return nullptr;
+    }
+
+    if (dstbuf == nullptr) {
+        if ((dstbuf = PIL_Win32PathBufferCreate(&dsinfo, nullptr, appinfo, appstr)) != nullptr) {
+            while (dstbuf && *dstbuf) {
+                if (*dstbuf == '\\') {
+                    *dstbuf = '/';
+                } dstbuf = PIL_Utf8StringNextCodepoint(nullptr, nullptr, dstbuf);
+            }
+            if (o_dstinfo) {
+                memcpy(o_dstinfo, &dsinfo, sizeof(PIL_STRING_INFO));
+            } return dsinfo.Buffer;
+        } else {
+            if (o_dstinfo) {
+                memset(o_dstinfo, 0, sizeof(PIL_STRING_INFO));
+            } return nullptr; // Allocation failed.
+        }
+    }
+
+    if (dsinfo.LengthChars > 0 && dsinfo.BufferEnd[-2] != '\\') {
+        if (dsinfo.LengthChars + ssinfo.LengthChars + 1 > PIL_WIN32_PATH_STRING_MAX_CHARS) {
+            if (o_dstinfo) {
+                memcpy(o_dstinfo, &dsinfo, sizeof(PIL_STRING_INFO));
+            } errno = ENAMETOOLONG;
+            return nullptr;
+        }
+        dsinfo.BufferEnd[-1] = '/';
+        dsinfo.LengthBytes++;
+        dsinfo.LengthChars++;
+    }
+    memcpy(dsinfo.BufferEnd, ssinfo.Buffer, ssinfo.LengthBytes);
+    dstbuf              = dsinfo.BufferEnd;
+    dsinfo.BufferEnd   += ssinfo.LengthBytes;
+    dsinfo.LengthBytes += ssinfo.LengthBytes;
+    dsinfo.LengthChars += ssinfo.LengthChars;
+    while (*dstbuf) {
+        if (*dstbuf == '\\') {
+            *dstbuf = '/';
+        } dstbuf = PIL_Utf8StringNextCodepoint(nullptr, nullptr, dstbuf);
+    }
+    if (o_dstinfo) {
+        memcpy(o_dstinfo, &dsinfo, sizeof(PIL_STRING_INFO));
+    } return dsinfo.Buffer;
+}
 
 PIL_API(char*)
 PIL_Win32PathBufferAppend
@@ -537,14 +612,20 @@ PIL_Win32PathBufferAppend
             return nullptr;
         }
         dsinfo.BufferEnd[-1] = '\\';
+        dsinfo.LengthBytes++;
+        dsinfo.LengthChars++;
     }
-    while (ssinfo.Buffer != ssinfo.BufferEnd) {
-        if (ssinfo.Buffer[0] != '/') {
-            dsinfo.BufferEnd[-1] = ssinfo.Buffer++;
-        } else {
-            // TODO: Finish me
-        }
+    memcpy(dsinfo.BufferEnd, ssinfo.Buffer, ssinfo.LengthBytes);
+    dstbuf              = dsinfo.BufferEnd;
+    dsinfo.BufferEnd   += ssinfo.LengthBytes;
+    dsinfo.LengthBytes += ssinfo.LengthBytes;
+    dsinfo.LengthChars += ssinfo.LengthChars;
+    while (*dstbuf) {
+        if (*dstbuf == '/') {
+            *dstbuf = '\\';
+        } dstbuf = PIL_Utf8StringNextCodepoint(nullptr, nullptr, dstbuf);
     }
+    if (o_dstinfo) {
+        memcpy(o_dstinfo, &dsinfo, sizeof(PIL_STRING_INFO));
+    } return dsinfo.Buffer;
 }
-#endif
-
